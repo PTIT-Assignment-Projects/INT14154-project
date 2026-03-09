@@ -9,7 +9,7 @@ from src.preprocessing import TextProcessor
 
 
 class ToxicDataset(Dataset):
-    def __init__(self, df, processor, text_column=TEXT_COLUMN, label_columns=None):
+    def __init__(self, df, processor, text_column=TEXT_COLUMN, label_columns=LABEL_COLUMNS):
         """
         PyTorch Dataset for toxic comment classification.
 
@@ -22,7 +22,7 @@ class ToxicDataset(Dataset):
         self.df: pd.DataFrame = df
         self.processor: TextProcessor = processor
         self.text_column: Optional[str] = text_column
-        self.label_columns: Optional[list] = label_columns or LABEL_COLUMNS
+        self.label_columns: Optional[list] = label_columns
 
     def __len__(self):
         return len(self.df)
