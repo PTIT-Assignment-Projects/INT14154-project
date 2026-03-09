@@ -12,7 +12,7 @@ class TextProcessor:
         """
         self.model_name = model_name
         self.max_len = max_len
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        AutoTokenizer.from_pretrained(model_name)
         self.sentence_model = None
 
     def tokenize(self, texts, return_tensors="pt"):

@@ -5,6 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.14"
 dependencies = [
     "pandas==3.0.1",
-    "torch>=2.10.0",
+    "tqdm",
+    "scikit-learn",
     "transformers>=5.3.0",
 ]
