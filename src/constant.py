@@ -29,5 +29,5 @@ DROPOUT = 0.3
 
 # model type
 BILSTM_MODEL = 'bilstm'
-ATTENTION_LSTM_MODEL = 'attention_lstm'
+ATTENTION_BILSTM_MODEL = 'attention_bilstm'
 LSTM_MODEL = 'lstm'

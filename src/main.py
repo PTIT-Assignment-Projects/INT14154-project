@@ -15,7 +15,7 @@ from src.constant import (
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM
+from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU
 
 # Hyperparameters
 
@@ -100,6 +100,17 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = ATTENTION_BILSTM_MODEL_PATH
+    elif model_type == "gru":
+        model = OwnGRU(
+            vocab_size=processor.tokenizer.vocab_size,
+            embedding_dim=EMBEDDING_DIM,
+            hidden_size=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            num_classes=len(LABEL_COLUMNS),
+            dropout=DROPOUT
+        ).to(device)
+        # Using a default path for GRU if not defined in constant.py
+        model_path = "models/gru_model.pth"
     else:
         model = OwnLSTM(
             vocab_size=processor.tokenizer.vocab_size,
