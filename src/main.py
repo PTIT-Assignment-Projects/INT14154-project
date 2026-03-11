@@ -9,11 +9,12 @@ from tqdm import tqdm
 from src.constant import (
     TRAIN_CSV_PATH, TEST_CSV_PATH, SUBMISSION_CSV_PATH,
     LABEL_COLUMNS, TEXT_COLUMN,
-    LSTM_MODEL_PATH, BILSTM_MODEL_PATH
+    LSTM_MODEL_PATH, BILSTM_MODEL_PATH, 
+    ATTENTION_LSTM_MODEL_PATH, ATTENTION_BILSTM_MODEL_PATH
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM
+from src.models import OwnLSTM, OwnBiLSTM, AttentionLSTM, AttentionBiLSTM
 
 # Hyperparameters
 BATCH_SIZE = 32
@@ -96,6 +97,26 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = BILSTM_MODEL_PATH
+    elif model_type == "attention_lstm":
+        model = AttentionLSTM(
+            vocab_size=processor.tokenizer.vocab_size,
+            embedding_dim=EMBEDDING_DIM,
+            hidden_size=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            num_classes=len(LABEL_COLUMNS),
+            dropout=DROPOUT
+        ).to(device)
+        model_path = ATTENTION_LSTM_MODEL_PATH
+    elif model_type == "attention_bilstm":
+        model = AttentionBiLSTM(
+            vocab_size=processor.tokenizer.vocab_size,
+            embedding_dim=EMBEDDING_DIM,
+            hidden_size=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            num_classes=len(LABEL_COLUMNS),
+            dropout=DROPOUT
+        ).to(device)
+        model_path = ATTENTION_BILSTM_MODEL_PATH
     else:
         model = OwnLSTM(
             vocab_size=processor.tokenizer.vocab_size,
