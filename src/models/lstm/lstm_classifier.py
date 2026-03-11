@@ -7,7 +7,7 @@ class OwnLSTM(nn.Module):
     Unidirectional LSTM implemented from scratch for sequence classification.
     """
     def __init__(self, vocab_size: int, embedding_dim: int, hidden_size: int, num_layers: int, num_classes: int, dropout: float):
-        super.__init__()
+        super(OwnLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
 

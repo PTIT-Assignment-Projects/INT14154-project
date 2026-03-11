@@ -8,23 +8,17 @@ from tqdm import tqdm
 
 from src.constant import (
     TRAIN_CSV_PATH, TEST_CSV_PATH, SUBMISSION_CSV_PATH,
-    LABEL_COLUMNS, TEXT_COLUMN,
-    LSTM_MODEL_PATH, BILSTM_MODEL_PATH, 
-    ATTENTION_LSTM_MODEL_PATH, ATTENTION_BILSTM_MODEL_PATH
+    LABEL_COLUMNS,
+    LSTM_MODEL_PATH, BILSTM_MODEL_PATH,
+    ATTENTION_BILSTM_MODEL_PATH, BATCH_SIZE, MAX_LEN, EMBEDDING_DIM, HIDDEN_SIZE, NUM_LAYERS,
+    DROPOUT, LEARNING_RATE, EPOCHS
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM, AttentionLSTM, AttentionBiLSTM
+from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM
 
 # Hyperparameters
-BATCH_SIZE = 32
-LEARNING_RATE = 1e-3
-EPOCHS = 3
-MAX_LEN = 128
-EMBEDDING_DIM = 128
-HIDDEN_SIZE = 256
-NUM_LAYERS = 2
-DROPOUT = 0.3
+
 
 def generate_submission(model, processor, device, submission_path):
     print(f"Generating submission to {submission_path}...")
@@ -88,7 +82,6 @@ def train_model(model_type="bilstm"):
     print(f"Building {model_type} model...")
     if model_type == "bilstm":
         model = OwnBiLSTM(
-            input_size=EMBEDDING_DIM,
             vocab_size=processor.tokenizer.vocab_size,
             embedding_dim=EMBEDDING_DIM,
             hidden_size=HIDDEN_SIZE,
@@ -97,16 +90,6 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = BILSTM_MODEL_PATH
-    elif model_type == "attention_lstm":
-        model = AttentionLSTM(
-            vocab_size=processor.tokenizer.vocab_size,
-            embedding_dim=EMBEDDING_DIM,
-            hidden_size=HIDDEN_SIZE,
-            num_layers=NUM_LAYERS,
-            num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
-        ).to(device)
-        model_path = ATTENTION_LSTM_MODEL_PATH
     elif model_type == "attention_bilstm":
         model = AttentionBiLSTM(
             vocab_size=processor.tokenizer.vocab_size,

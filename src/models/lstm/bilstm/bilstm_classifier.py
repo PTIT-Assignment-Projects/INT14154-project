@@ -31,7 +31,7 @@ class OwnBiLSTM(nn.Module):
         # We take the output of the last BiLSTM layer (hidden_size * 2)
         self.fc = nn.Linear(hidden_size * 2, num_classes)
 
-    def forward(self, x):
+    def forward(self, x, attention_mask=None):
         # x: (batch_size, seq_len)
         batch_size, seq_len = x.size()
         
