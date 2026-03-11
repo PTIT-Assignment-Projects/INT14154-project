@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
-
-
+from src.models.lstm.lstm_cell import OwnLSTMCell
 
 class OwnBiLSTM(nn.Module):
     """
     Bidirectional LSTM implemented from scratch for sequence classification.
     """
-    def __init__(self, input_size: int, vocab_size: int, embedding_dim: int, hidden_size: int, num_layers: int, num_classes: int, dropout: float):
-        super(OwnBiLSTM, self).__init__()
+    def __init__(self, vocab_size: int, embedding_dim: int, hidden_size: int, num_layers: int, num_classes: int, dropout: float):
+        super.__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.num_directions = 2

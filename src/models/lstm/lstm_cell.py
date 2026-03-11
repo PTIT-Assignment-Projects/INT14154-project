@@ -6,7 +6,7 @@ class OwnLSTMCell(nn.Module):
     """
 
     def __init__(self, input_size, hidden_size):
-        super(OwnLSTMCell, self).__init__()
+        super.__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
 
