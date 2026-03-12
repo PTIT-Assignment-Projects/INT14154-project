@@ -12,11 +12,11 @@ from src.constant import (
     LSTM_MODEL_PATH, BILSTM_MODEL_PATH,
     ATTENTION_BILSTM_MODEL_PATH, BATCH_SIZE, MAX_LEN, EMBEDDING_DIM, HIDDEN_SIZE, NUM_LAYERS,
     DROPOUT, LEARNING_RATE, EPOCHS, BILSTM_MODEL, ATTENTION_BILSTM_MODEL, GRU_MODEL, GRU_MODEL_PATH, RCNN_MODEL_PATH,
-    RCNN_MODEL, LSTM_MODEL
+    RCNN_MODEL, LSTM_MODEL, TRANSFORMER_MODEL, TRANSFORMER_MODEL_PATH
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU, OwnRCNN
+from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU, OwnRCNN, OwnTransformer
 
 # Hyperparameters
 
@@ -121,6 +121,16 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = RCNN_MODEL_PATH
+    elif model_type == TRANSFORMER_MODEL:
+        model = OwnTransformer(
+            vocab_size=processor.tokenizer.vocab_size,
+            embedding_dim=EMBEDDING_DIM,
+            hidden_size=HIDDEN_SIZE, # used for feedforward_dim
+            num_layers=NUM_LAYERS,
+            num_classes=len(LABEL_COLUMNS),
+            dropout=DROPOUT
+        ).to(device)
+        model_path = TRANSFORMER_MODEL_PATH
     elif model_type == LSTM_MODEL:
         model = OwnLSTM(
             vocab_size=processor.tokenizer.vocab_size,
