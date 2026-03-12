@@ -11,11 +11,12 @@ from src.constant import (
     LABEL_COLUMNS,
     LSTM_MODEL_PATH, BILSTM_MODEL_PATH,
     ATTENTION_BILSTM_MODEL_PATH, BATCH_SIZE, MAX_LEN, EMBEDDING_DIM, HIDDEN_SIZE, NUM_LAYERS,
-    DROPOUT, LEARNING_RATE, EPOCHS
+    DROPOUT, LEARNING_RATE, EPOCHS, BILSTM_MODEL, ATTENTION_BILSTM_MODEL, GRU_MODEL, GRU_MODEL_PATH, RCNN_MODEL_PATH,
+    RCNN_MODEL, LSTM_MODEL
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU
+from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU, OwnRCNN
 
 # Hyperparameters
 
@@ -80,7 +81,7 @@ def train_model(model_type="bilstm"):
 
     # 4. Initialize Model
     print(f"Building {model_type} model...")
-    if model_type == "bilstm":
+    if model_type == BILSTM_MODEL:
         model = OwnBiLSTM(
             vocab_size=processor.tokenizer.vocab_size,
             embedding_dim=EMBEDDING_DIM,
@@ -90,7 +91,7 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = BILSTM_MODEL_PATH
-    elif model_type == "attention_bilstm":
+    elif model_type == ATTENTION_BILSTM_MODEL:
         model = AttentionBiLSTM(
             vocab_size=processor.tokenizer.vocab_size,
             embedding_dim=EMBEDDING_DIM,
@@ -100,7 +101,7 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = ATTENTION_BILSTM_MODEL_PATH
-    elif model_type == "gru":
+    elif model_type == GRU_MODEL:
         model = OwnGRU(
             vocab_size=processor.tokenizer.vocab_size,
             embedding_dim=EMBEDDING_DIM,
@@ -109,9 +110,18 @@ def train_model(model_type="bilstm"):
             num_classes=len(LABEL_COLUMNS),
             dropout=DROPOUT
         ).to(device)
-        # Using a default path for GRU if not defined in constant.py
-        model_path = "models/gru_model.pth"
-    else:
+        model_path = GRU_MODEL_PATH
+    elif model_type == RCNN_MODEL:
+        model = OwnRCNN(
+            vocab_size=processor.tokenizer.vocab_size,
+            embedding_dim=EMBEDDING_DIM,
+            hidden_size=HIDDEN_SIZE,
+            num_layers=NUM_LAYERS,
+            num_classes=len(LABEL_COLUMNS),
+            dropout=DROPOUT
+        ).to(device)
+        model_path = RCNN_MODEL_PATH
+    elif model_type == LSTM_MODEL:
         model = OwnLSTM(
             vocab_size=processor.tokenizer.vocab_size,
             embedding_dim=EMBEDDING_DIM,
@@ -121,6 +131,8 @@ def train_model(model_type="bilstm"):
             dropout=DROPOUT
         ).to(device)
         model_path = LSTM_MODEL_PATH
+    else:
+        raise ValueError(f"Unsupported model_type: {model_type}")
 
     # 5. Loss & Optimizer
     criterion = nn.BCEWithLogitsLoss()

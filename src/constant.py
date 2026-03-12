@@ -10,7 +10,9 @@ SUBMISSION_CSV_PATH = "datasets/submission.csv"
 LSTM_MODEL_PATH = "models/lstm_params.pth"
 BILSTM_MODEL_PATH = "models/bilstm_params.pth"
 ATTENTION_BILSTM_MODEL_PATH = "models/attention_bilstm_params.pth"
-
+GRU_MODEL_PATH = 'models/gru_params.pth'
+RCNN_MODEL_PATH = 'models/rcnn_params.pth'
+TRANSFORMER_MODEL_PATH = 'models/transformer_params.pth'
 
 
 
@@ -31,3 +33,6 @@ DROPOUT = 0.3
 BILSTM_MODEL = 'bilstm'
 ATTENTION_BILSTM_MODEL = 'attention_bilstm'
 LSTM_MODEL = 'lstm'
+GRU_MODEL = 'gru'
+RCNN_MODEL = 'rcnn'
+TRANSFORMER_MODEL = 'transformer'
