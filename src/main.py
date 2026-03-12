@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, random_split
 from torch.optim import Adam
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from src.constant import (
     TRAIN_CSV_PATH, TEST_CSV_PATH, SUBMISSION_CSV_PATH,
@@ -150,6 +151,8 @@ def train_model(model_type="bilstm"):
 
     # 6. Training Loop
     print(f"Starting training for {model_type}...")
+    train_losses = []
+    val_losses = []
     for epoch in range(EPOCHS):
         model.train()
         total_loss = 0
@@ -187,9 +190,24 @@ def train_model(model_type="bilstm"):
 
         avg_train_loss = total_loss / len(train_loader)
         avg_val_loss = val_loss / len(val_loader)
+        train_losses.append(avg_train_loss)
+        val_losses.append(avg_val_loss)
         print(f"Epoch {epoch+1} summary | Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
 
-    # 7. Save Model
+    # 7. Plotting
+    os.makedirs("plots", exist_ok=True)
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(1, EPOCHS + 1), train_losses, label='Train Loss')
+    plt.plot(range(1, EPOCHS + 1), val_losses, label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title(f'Training and Validation Loss: {model_type}')
+    plt.legend()
+    plot_path = f"plots/{model_type}_loss_plot.png"
+    plt.savefig(plot_path)
+    print(f"Loss plot saved as {plot_path}")
+
+    # 8. Save Model
     torch.save(model.state_dict(), model_path)
     print(f"Training complete! Model saved as {model_path}.")
     
