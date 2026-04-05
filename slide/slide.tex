@@ -1,0 +1,505 @@
+% !TEX program = xelatex
+\documentclass[serif, aspectratio=169]{beamer}
+
+\usepackage{fontspec}
+\newfontfamily\myfont{Arial}
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{lipsum}
+\usepackage[sort, round]{natbib}
+\bibliographystyle{plainnat}
+\usepackage{hyperref}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,calc}
+
+\usepackage{HKUSTstyle}
+\renewcommand{\figurename}{Ảnh}
+\author{Vũ Công Tuấn Dương -- B22DCKH024}
+\title{Phân loại bình luận độc hại -- So sánh các mô hình Deep Learning từ cài đặt gốc}
+\institute{Khoa CNTT1 -- PTIT}
+\date{\small \today}
+
+\definecolor{hkustblue}{RGB}{0, 56, 116}
+\definecolor{hkustred}{RGB}{209, 51, 59}
+\definecolor{codegreen}{RGB}{0, 128, 0}
+\definecolor{darkblue}{RGB}{0, 0, 139}
+
+% Custom commands
+\newcommand{\highlight}[1]{\textbf{\color{hkustblue}#1}}
+\newcommand{\red}[1]{\textbf{\color{hkustred}#1}}
+\newcommand{\green}[1]{\textbf{\color{codegreen}#1}}
+
+\begin{document}
+
+% --- Title Slide ---
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% --- Table of Contents ---
+\begin{frame}{Mục lục}
+    \tableofcontents
+\end{frame}
+
+\section{Giới thiệu}
+
+\begin{frame}{Mục tiêu đề tài}
+\begin{itemize}
+    \item \textbf{Bài toán:} Phân loại đa nhãn bình luận độc hại (Toxic Comment Classification)
+    \begin{itemize}
+        \item 6 nhãn: toxic, severe\_toxic, obscene, threat, insult, identity\_hate
+        \item Dữ liệu: Jigsaw Toxic Comment Classification (Kaggle)
+    \end{itemize}
+    \item \textbf{Cài đặt từ gốc (from scratch)} 7 mô hình:
+    \begin{itemize}
+        \item LSTM, BiLSTM, GRU, RCNN, Transformer
+        \item Attention LSTM, Attention BiLSTM
+    \end{itemize}
+    \item \textbf{Tối ưu:} Class-Weighted Loss, AdamW, Gradient Clipping, Warmup Cosine LR Scheduler, Early Stopping
+    \item \textbf{Tokenizer:} DistilBERT (AutoTokenizer)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Tập dữ liệu}
+\begin{itemize}
+    \item \textbf{Nguồn:} Jigsaw Toxic Comment Classification Challenge (Kaggle)
+    \item \textbf{Tổng số mẫu:} 159,571 bình luận
+    \item \textbf{Chia tập:} 80\% train / 20\% validation (stratified split)
+    \item \textbf{Đặc điểm:} Mất cân bằng lớp nghiêm trọng
+\end{itemize}
+\vspace{0.3cm}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Nhãn & Tỷ lệ (\%) & Số mẫu \\
+\midrule
+toxic & 9.4 & ~15,000 \\
+severe\_toxic & 1.0 & ~1,600 \\
+obscene & 5.0 & ~8,000 \\
+threat & 0.2 & ~320 \\
+insult & 4.8 & ~7,600 \\
+identity\_hate & 0.9 & ~1,400 \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+\section{Cơ sở lý thuyết}
+
+\subsection{LSTM}
+\begin{frame}{Long Short-Term Memory (LSTM)}
+\textbf{Vấn đề của RNN truyền thống:} Vanishing/Exploding Gradient khi xử lý chuỗi dài.
+
+\vspace{0.3cm}
+\textbf{Giải pháp:} LSTM sử dụng 3 cổng (gates) để điều khiển luồng thông tin:
+\begin{itemize}
+    \item \textbf{Forget gate ($f_t$):} Quyết định thông tin nào giữ lại từ $c_{t-1}$
+    \item \textbf{Input gate ($i_t$):} Quyết định thông tin mới nào lưu vào cell state
+    \item \textbf{Output gate ($o_t$):} Quyết định thông tin nào xuất ra hidden state
+\end{itemize}
+\vspace{0.3cm}
+\begin{align*}
+f_t &= \sigma(W_{hf} h_{t-1} + W_{xf} x_t + b_f) \\
+i_t &= \sigma(W_{hi} h_{t-1} + W_{xi} x_t + b_i) \\
+\tilde{c}_t &= \tanh(W_{hc} h_{t-1} + W_{xc} x_t + b_c) \\
+c_t &= f_t \odot c_{t-1} + i_t \odot \tilde{c}_t \\
+o_t &= \sigma(W_{ho} h_{t-1} + W_{xo} x_t + b_o) \\
+h_t &= o_t \odot \tanh(c_t)
+\end{align*}
+\end{frame}
+
+\subsection{BiLSTM}
+\begin{frame}{Bidirectional LSTM (BiLSTM)}
+\textbf{Ý tưởng:} Xử lý chuỗi theo \textbf{cả hai hướng} để nắm bắt ngữ cảnh quá khứ và tương lai.
+
+\vspace{0.3cm}
+\begin{itemize}
+    \item \textbf{Forward LSTM:} Đọc từ trái $\rightarrow$ phải, nắm bắt ngữ cảnh trước
+    \item \textbf{Backward LSTM:} Đọc từ phải $\rightarrow$ trái, nắm bắt ngữ cảnh sau
+    \item \textbf{Hidden state cuối:} Nối (concat) hai hướng
+\end{itemize}
+\vspace{0.3cm}
+\[
+\overrightarrow{h_t} = \text{LSTM}_{\rightarrow}(x_t, \overrightarrow{h_{t-1}}), \quad
+\overleftarrow{h_t} = \text{LSTM}_{\leftarrow}(x_t, \overleftarrow{h_{t+1}})
+\]
+\[
+h_t = [\overrightarrow{h_t} ; \overleftarrow{h_t}]
+\]
+\vspace{0.2cm}
+\textbf{Ưu điểm:} Hiểu ngữ cảnh toàn cục tốt hơn so với LSTM đơn hướng.
+\end{frame}
+
+\subsection{GRU}
+\begin{frame}{Gated Recurrent Unit (GRU)}
+\textbf{Đặc điểm:} Biến thể đơn giản hóa của LSTM, chỉ có \textbf{2 cổng}:
+\begin{itemize}
+    \item \textbf{Update gate ($z_t$):} Kết hợp vai trò của forget + input gate
+    \item \textbf{Reset gate ($r_t$):} Kiểm soát thông tin quá khứ cần "quên"
+\end{itemize}
+\vspace{0.3cm}
+\begin{align*}
+z_t &= \sigma(W_{hz} h_{t-1} + W_{xz} x_t + b_z) \\
+r_t &= \sigma(W_{hr} h_{t-1} + W_{xr} x_t + b_r) \\
+\tilde{h}_t &= \tanh(W_{hn}(r_t \odot h_{t-1}) + W_{xn} x_t + b_n) \\
+h_t &= (1 - z_t) \odot \tilde{h}_t + z_t \odot h_{t-1}
+\end{align*}
+\vspace{0.2cm}
+\textbf{Ưu điểm:} Ít tham số hơn LSTM $\rightarrow$ huấn luyện nhanh hơn, ít nguy cơ overfitting.
+\end{frame}
+
+\subsection{RCNN}
+\begin{frame]{Recurrent Convolutional Neural Network (RCNN)}
+\textbf{Ý tưởng:} Kết hợp ưu điểm của RNN (ngữ cảnh tuần tự) và CNN (trích xuất đặc trưng cục bộ).
+
+\vspace{0.3cm}
+\textbf{Kiến trúc:}
+\begin{enumerate}
+    \item \textbf{Forward + Backward RNN:} Thu thập ngữ cảnh trái và phải cho mỗi từ
+    \item \textbf{Concatenate:} Nối [ngữ cảnh trái + embedding từ + ngữ cảnh phải]
+    \item \textbf{Fusion layer:} $\tanh(W \cdot [c_L; x; c_R] + b)$ -- tích hợp đặc trưng
+    \item \textbf{Max pooling:} Lấy đặc trưng quan trọng nhất trên toàn bộ chuỗi
+    \item \textbf{Fully connected:} Phân loại đầu ra
+\end{enumerate}
+\vspace{0.2cm}
+\textbf{Ưu điểm:} Max pooling giúp tập trung vào các từ khóa quan trọng nhất, bất kể vị trí.
+\end{frame}
+
+\subsection{Transformer}
+\begin{frame]{Transformer Encoder (Self-Attention)}
+\textbf{Khác biệt cốt lõi:} Không dùng RNN $\rightarrow$ xử lý song song toàn bộ chuỗi.
+
+\vspace{0.3cm}
+\textbf{Self-Attention:} Mỗi từ "chú ý" đến tất cả từ khác trong câu:
+\[
+\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\]
+\vspace{0.2cm}
+\textbf{Multi-Head Attention:} Chạy nhiều attention song song với các không gian con khác nhau:
+\[
+\text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W^O
+\]
+\vspace{0.2cm}
+\textbf{Positional Encoding:} Bổ sung thông tin vị trí vì không có thứ tự tự nhiên:
+\[
+PE_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i/d}}\right), \quad
+PE_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right)
+\]
+\end{frame}
+
+\begin{frame}{Kiến trúc Transformer Encoder Block}
+Mỗi block gồm 2 thành phần chính:
+\begin{enumerate}
+    \item \textbf{Multi-Head Self-Attention:}
+    \begin{itemize}
+        \item Tính attention giữa tất cả cặp từ
+        \item Masking với attention mask (bỏ qua padding tokens)
+    \end{itemize}
+    \item \textbf{Feed-Forward Network:}
+    \begin{itemize}
+        \item 2 lớp tuyến tính: Linear $\rightarrow$ ReLU $\rightarrow$ Dropout $\rightarrow$ Linear
+        \item Áp dụng độc lập cho từng vị trí
+    \end{itemize}
+\end{enumerate}
+\vspace{0.2cm}
+\textbf{Residual connection + Layer Normalization:}
+\[
+x' = \text{LayerNorm}(x + \text{Dropout}(\text{Attention}(x)))
+\]
+\[
+x'' = \text{LayerNorm}(x' + \text{Dropout}(\text{FFN}(x')))
+\]
+\end{frame}
+
+\subsection{Attention}
+\begin{frame}{Cơ chế Attention}
+\textbf{Ý tưởng:} Thay vì dùng hidden state cuối cùng hoặc mean pooling, gán \textbf{trọng số khác nhau} cho từng time step.
+
+\vspace{0.3cm}
+\textbf{Self-Attention (Bahdanau-style):}
+\begin{align*}
+e_t &= \tanh(W_a h_t + b_a) \\
+\alpha_t &= \text{softmax}(v^T e_t) \\
+c &= \sum_{t=1}^{T} \alpha_t h_t
+\end{align*}
+\vspace{0.2cm}
+\begin{itemize}
+    \item $h_t$: hidden state tại time step $t$
+    \item $\alpha_t$: trọng số attention (tổng = 1)
+    \item $c$: context vector -- trọng số của toàn bộ chuỗi
+\end{itemize}
+\vspace{0.2cm}
+\textbf{Ưu điểm:} Mô hình tự động học được từ/cụm từ nào quan trọng nhất cho việc phân loại.
+\end{frame}
+
+\section{Phương pháp tối ưu}
+
+\begin{frame}{Class-Weighted Loss}
+\textbf{Vấn đề:} Dữ liệu mất cân bằng nghiêm trọng (threat chỉ ~0.2\%, toxic ~9.4\%).
+
+\vspace{0.3cm}
+\textbf{Giải pháp:} BCEWithLogitsLoss với trọng số lớp:
+\[
+\text{pos\_weight}_c = \frac{\text{số mẫu âm}_c}{\text{số mẫu dương}_c}
+\]
+\[
+\mathcal{L} = -\frac{1}{N} \sum_{i=1}^{N} \sum_{c=1}^{C} w_c \cdot [y_{ic} \log(\sigma(x_{ic})) + (1-y_{ic}) \log(1-\sigma(x_{ic}))]
+\]
+\vspace{0.2cm}
+\textbf{Clip trọng số:} Giới hạn tối đa ở \textbf{50x} để tránh over-penalizing lớp đa số, cải thiện precision.
+\end{frame}
+
+\begin{frame}{AdamW Optimizer}
+\textbf{AdamW} = Adam + \textbf{Weight Decay tách biệt} (decoupled).
+
+\vspace{0.3cm}
+\begin{itemize}
+    \item \textbf{Adam thường:} Weight decay ghép vào gradient $\rightarrow$ không hiệu quả với adaptive learning rate
+    \item \textbf{AdamW:} Áp dụng weight decay \textbf{trực tiếp} lên tham số sau bước cập nhật
+\end{itemize}
+\vspace{0.3cm}
+\[
+\theta_{t+1} = \theta_t - \eta \cdot \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} - \eta \cdot \lambda \cdot \theta_t
+\]
+\vspace{0.2cm}
+\begin{itemize}
+    \item $\eta$: learning rate ($2 \times 10^{-3}$)
+    \item $\lambda$: weight decay ($10^{-4}$)
+    \item $\hat{m}_t, \hat{v}_t$: bias-corrected first/second moment
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Gradient Clipping}
+\textbf{Vấn đề:} Exploding gradient -- gradient quá lớn làm cập nhật tham số mất ổn định.
+
+\vspace{0.3cm}
+\textbf{Giải pháp:} Cắt gradient nếu chuẩn vượt ngưỡng:
+\[
+\text{Nếu } \|\mathbf{g}\|_2 > \text{max\_norm} \Rightarrow \mathbf{g} \leftarrow \mathbf{g} \cdot \frac{\text{max\_norm}}{\|\mathbf{g}\|_2}
+\]
+\vspace{0.2cm}
+\begin{itemize}
+    \item \textbf{max\_norm} = 1.0
+    \item Áp dụng trước \texttt{optimizer.step()}
+    \item Đặc biệt quan trọng với RNN/LSTM (chuỗi dài)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Warmup Cosine LR Scheduler}
+\textbf{Warmup phase:} Tăng learning rate tuyến tính từ 0 $\rightarrow$ LR tối đa trong \textbf{10\%} tổng số bước.
+
+\vspace{0.3cm}
+\textbf{Cosine decay phase:} Giảm learning rate theo hàm cosine:
+\[
+\text{LR}(step) = \text{LR}_{\min} + (\text{LR}_{\max} - \text{LR}_{\min}) \cdot \frac{1}{2}\left(1 + \cos\left(\pi \cdot \frac{step - warmup}{total - warmup}\right)\right)
+\]
+\vspace{0.2cm}
+\begin{itemize}
+    \item \textbf{Warmup:} Tránh cập nhật quá mạnh ở đầu huấn luyện
+    \item \textbf{Cosine decay:} Giảm dần mượt mà $\rightarrow$ hội tụ tốt hơn
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Early Stopping}
+\textbf{Giám sát:} \textbf{Validation ROC-AUC (macro)} -- metric chính của bài toán.
+
+\vspace{0.3cm}
+\begin{itemize}
+    \item \textbf{Patience:} 4 epochs không cải thiện $\rightarrow$ dừng
+    \item \textbf{Mode:} Maximize (theo dõi ROC-AUC, không phải loss)
+    \item \textbf{Checkpoint:} Lưu lại state của mô hình tốt nhất, restore khi dừng
+\end{itemize}
+\vspace{0.2cm}
+\textbf{Tại sao dùng AUC thay vì loss?}
+\begin{itemize}
+    \item Class-weighted loss bị ảnh hưởng bởi trọng số $\rightarrow$ không phản ánh đúng chất lượng
+    \item ROC-AUC đo khả năng phân biệt thực sự, bất kể threshold
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Optimal Threshold Search}
+\textbf{Vấn đề:} Threshold mặc định 0.5 không tối ưu cho dữ liệu mất cân bằng.
+
+\vspace{0.3cm}
+\textbf{Giải pháp:} Tìm threshold tối ưu \textbf{cho từng lớp} riêng biệt:
+\begin{itemize}
+    \item Duyệt threshold từ 0.1 đến 0.9 (bước 0.01)
+    \item Chọn threshold cho F1-score cao nhất trên validation set
+    \item Mỗi lớp có threshold khác nhau phù hợp với phân phối riêng
+\end{itemize}
+\vspace{0.2cm}
+\textbf{Kết quả:} Cải thiện đáng kể precision (giảm false positives) trong khi vẫn giữ recall cao.
+\end{frame}
+
+\section{Kết quả và nhận xét}
+
+\begin{frame}{So sánh tổng quan các mô hình}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Mô hình} & \textbf{Params} & \textbf{Best AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} & \textbf{Thời gian/epoch} \\
+\midrule
+\textbf{RCNN} & 6.6M & \textbf{0.9663} & 0.4312 & 0.5972 & ~105s \\
+LSTM & 4.8M & 0.9555 & 0.4354 & 0.5484 & ~56s \\
+BiLSTM & 6.3M & 0.9505 & 0.4106 & 0.5081 & ~103s \\
+Attn BiLSTM & 6.5M & 0.9483 & 0.3842 & 0.5260 & ~103s \\
+GRU & 4.6M & 0.9441 & 0.4847 & 0.5952 & ~74s \\
+Transformer & 4.3M & 0.9429 & 0.4934 & 0.6163 & ~12s \\
+Attn LSTM & 4.9M & 0.9289 & 0.4285 & 0.5655 & ~56s \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{0.2cm}
+\textbf{Best model: RCNN} (Val ROC-AUC = 0.9663)
+\end{frame}
+
+\begin{frame}{Kết quả chi tiết -- RCNN (Best Model)}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+\midrule
+toxic & 0.29 & 0.82 & 0.43 & 0.9071 \\
+severe\_toxic & 0.13 & 0.94 & 0.22 & 0.9910 \\
+obscene & 0.29 & 0.87 & 0.43 & 0.9486 \\
+threat & 0.02 & 0.50 & 0.04 & 0.9585 \\
+insult & 0.19 & 0.77 & 0.30 & 0.9168 \\
+identity\_hate & 0.08 & 0.59 & 0.14 & 0.9008 \\
+\midrule
+\textbf{Macro Avg} & \textbf{0.17} & \textbf{0.75} & \textbf{0.26} & \textbf{0.9372} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{0.2cm}
+\textbf{Nhận xét:} Recall cao nhưng precision thấp $\rightarrow$ mô hình dự đoán quá nhiều positive (do class weights).
+\end{frame}
+
+\begin{frame}{Kết quả chi tiết -- Transformer}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+\midrule
+toxic & 0.43 & 0.74 & 0.55 & 0.9134 \\
+severe\_toxic & 0.29 & 0.92 & 0.44 & 0.9842 \\
+obscene & 0.60 & 0.80 & 0.69 & 0.9570 \\
+threat & 0.01 & 0.20 & 0.03 & 0.8034 \\
+insult & 0.54 & 0.76 & 0.63 & 0.9414 \\
+identity\_hate & 0.12 & 0.71 & 0.21 & 0.9644 \\
+\midrule
+\textbf{Macro Avg} & \textbf{0.33} & \textbf{0.69} & \textbf{0.42} & \textbf{0.9273} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{0.2cm}
+\textbf{Nhận xét:} \red{Precision cao nhất} trong tất cả mô hình (F1 Macro = 0.49) $\rightarrow$ cân bằng tốt nhất giữa precision và recall.
+\end{frame}
+
+\begin{frame}{Kết quả chi tiết -- GRU}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
+\midrule
+toxic & 0.44 & 0.85 & 0.58 & 0.9334 \\
+severe\_toxic & 0.21 & 0.93 & 0.35 & 0.9798 \\
+obscene & 0.42 & 0.86 & 0.56 & 0.9626 \\
+threat & 0.04 & 0.75 & 0.07 & 0.8513 \\
+insult & 0.36 & 0.83 & 0.50 & 0.9478 \\
+identity\_hate & 0.14 & 0.68 & 0.23 & 0.9458 \\
+\midrule
+\textbf{Macro Avg} & \textbf{0.27} & \textbf{0.82} & \textbf{0.38} & \textbf{0.9368} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\vspace{0.2cm}
+\textbf{Nhận xét:} F1 Macro cao thứ 2 (0.48) -- hiệu quả tốt với ít tham số nhất (4.6M).
+\end{frame}
+
+\begin{frame}{Nhận xét chung}
+\begin{itemize}
+    \item \textbf{RCNN đạt AUC cao nhất (0.966):} Kiến trúc kết hợp Bi-directional + embedding + max pooling giúp trích xuất đặc trưng hiệu quả
+    \item \textbf{Transformer có F1 Macro tốt nhất (0.49):} Precision cao nhất $\rightarrow$ ít false positive, cân bằng tốt
+    \item \textbf{GRU hiệu quả nhất về tham số:} F1 Macro 0.48 với chỉ 4.6M params
+    \item \textbf{Attention không cải thiện đáng kể:} Có thể do dữ liệu nhỏ (10K mẫu) hoặc cần tuning thêm
+    \item \textbf{Vấn đề chung:} Recall cao nhưng precision thấp $\rightarrow$ class weights vẫn quá mạnh với một số lớp
+    \item \textbf{Threat luôn khó nhất:} Quá ít mẫu (~320/159K), AUC thấp nhất ở mọi mô hình
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Hướng phát triển}
+\begin{itemize}
+    \item \textbf{Dữ liệu:} Sử dụng toàn bộ 159K mẫu (hiện tại chỉ 10K do giới hạn thời gian)
+    \item \textbf{Pretrained embeddings:} GloVe, FastText thay vì embedding ngẫu nhiên
+    \item \textbf{Fine-tune class weights:} Tìm trọng số tối ưu thay vì ratio đơn thuần
+    \item \textbf{Ensemble:} Kết hợp predictions từ nhiều mô hình
+    \item \textbf{Data augmentation:} Back-translation, synonym replacement cho lớp thiểu số
+    \item \textbf{Hyperparameter tuning:} Grid search / Bayesian optimization
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Kết luận}
+\begin{itemize}
+    \item Đã cài đặt từ gốc \textbf{7 mô hình} deep learning cho phân loại văn bản
+    \item \textbf{RCNN} đạt ROC-AUC cao nhất (0.966), \textbf{Transformer} có F1 Macro tốt nhất (0.49)
+    \item Các phương pháp tối ưu (AdamW, Gradient Clipping, LR Scheduler, Class Weights) giúp mô hình hội tụ ổn định
+    \item \textbf{Thách thức chính:} Mất cân bằng lớp nghiêm trọng $\rightarrow$ precision thấp ở các lớp thiểu số
+    \item Cần thêm dữ liệu và fine-tuning để cải thiện kết quả
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\begin{center}
+    Cảm ơn thầy đã lắng nghe!
+\end{center}
+\end{frame}
+
+\begin{frame}[t, allowframebreaks]
+\frametitle{Tài liệu tham khảo}
+\begin{thebibliography}{9}
+\bibitem[Hochreiter và Schmidhuber(1997)]{lstm}
+Hochreiter, S., \& Schmidhuber, J. (1997). Long short-term memory. \textit{Neural Computation}, 9(8), 1735--1780.
+
+\bibitem[Cho et al.(2014)]{gru}
+Cho, K., et al. (2014). Learning phrase representations using RNN encoder-decoder for statistical machine translation. \textit{EMNLP}.
+
+\bibitem[Lai et al.(2015)]{rcnn}
+Lai, S., et al. (2015). Recurrent convolutional neural networks for text classification. \textit{AAAI}.
+
+\bibitem[Vaswani et al.(2017)]{transformer}
+Vaswani, A., et al. (2017). Attention is all you need. \textit{NeurIPS}.
+
+\bibitem[Bahdanau et al.(2014)]{attention}
+Bahdanau, D., et al. (2014). Neural machine translation by jointly learning to align and translate. \textit{ICLR}.
+
+\bibitem[Loshchilov và Hutter(2017)]{adamw}
+Loshchilov, I., \& Hutter, F. (2017). Decoupled weight decay regularization. \textit{ICLR}.
+\end{thebibliography}
+\end{frame}
+
+\end{document}
