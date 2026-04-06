@@ -81,21 +81,22 @@
     \item \textbf{Tổng số mẫu:} 159,571 bình luận
     \item \textbf{Chia tập:} 80\% train / 20\% validation (stratified split)
     \item \textbf{Đặc điểm:} Mất cân bằng lớp nghiêm trọng
+    \item \textbf{Validation set:} 31,915 mẫu
 \end{itemize}
 \vspace{0.3cm}
 \begin{table}
 \centering
 \small
-\begin{tabular}{lcc}
+\begin{tabular}{lccc}
 \toprule
-Nhãn & Tỷ lệ (\%) & Số mẫu \\
+Nhãn & Tỷ lệ (\%) & Class Weight (đã clip) & Số mẫu \\
 \midrule
-toxic & 9.4 & ~15,000 \\
-severe\_toxic & 1.0 & ~1,600 \\
-obscene & 5.0 & ~8,000 \\
-threat & 0.2 & ~320 \\
-insult & 4.8 & ~7,600 \\
-identity\_hate & 0.9 & ~1,400 \\
+toxic & 9.4 & 9.43 & ~15,000 \\
+severe\_toxic & 1.0 & 50.00 (clip) & ~1,600 \\
+obscene & 5.0 & 17.89 & ~8,000 \\
+threat & 0.2 & 50.00 (clip) & ~320 \\
+insult & 4.8 & 19.26 & ~7,600 \\
+identity\_hate & 0.9 & 50.00 (clip) & ~1,400 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -322,7 +323,7 @@ c &= \sum_{t=1}^{T} \alpha_t h_t
 
 \vspace{0.3cm}
 \begin{itemize}
-    \item \textbf{Patience:} 4 epochs không cải thiện $\rightarrow$ dừng
+    \item \textbf{Patience:} 2 epochs không cải thiện $\rightarrow$ dừng
     \item \textbf{Mode:} Maximize (theo dõi ROC-AUC, không phải loss)
     \item \textbf{Checkpoint:} Lưu lại state của mô hình tốt nhất, restore khi dừng
 \end{itemize}
@@ -350,29 +351,29 @@ c &= \sum_{t=1}^{T} \alpha_t h_t
 
 \section{Kết quả và nhận xét}
 
-\begin{frame}{So sánh tổng quan các mô hình}
+\begin{frame}{So sánh tổng quan các mô hình (full 159K mẫu)}
 \begin{table}
 \centering
 \small
-\begin{tabular}{lccccc}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Mô hình} & \textbf{Params} & \textbf{Best AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} & \textbf{Thời gian/epoch} \\
+\textbf{Mô hình} & \textbf{Params} & \textbf{Best AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\
 \midrule
-\textbf{RCNN} & 6.6M & \textbf{0.9663} & 0.4312 & 0.5972 & ~105s \\
-LSTM & 4.8M & 0.9555 & 0.4354 & 0.5484 & ~56s \\
-BiLSTM & 6.3M & 0.9505 & 0.4106 & 0.5081 & ~103s \\
-Attn BiLSTM & 6.5M & 0.9483 & 0.3842 & 0.5260 & ~103s \\
-GRU & 4.6M & 0.9441 & 0.4847 & 0.5952 & ~74s \\
-Transformer & 4.3M & 0.9429 & 0.4934 & 0.6163 & ~12s \\
-Attn LSTM & 4.9M & 0.9289 & 0.4285 & 0.5655 & ~56s \\
+\textbf{Attn BiLSTM} & 6.5M & \textbf{0.9834} & \textbf{0.6311} & \textbf{0.7324} \\
+RCNN & 6.6M & 0.9839 & 0.5689 & 0.6655 \\
+Attn LSTM & 4.9M & 0.9812 & 0.5650 & 0.6820 \\
+BiLSTM & 6.3M & 0.9800 & 0.5520 & 0.6689 \\
+LSTM & 4.8M & 0.9786 & 0.5459 & 0.6658 \\
+GRU & 4.6M & 0.9805 & 0.5146 & 0.6198 \\
+Transformer & 4.3M & 0.9789 & 0.4625 & 0.5947 \\
 \bottomrule
 \end{tabular}
 \end{table}
 \vspace{0.2cm}
-\textbf{Best model: RCNN} (Val ROC-AUC = 0.9663)
+\textbf{Best AUC:} RCNN (0.9839) \quad \textbf{Best F1 Macro:} Attention BiLSTM (0.6311)
 \end{frame}
 
-\begin{frame}{Kết quả chi tiết -- RCNN (Best Model)}
+\begin{frame}{Kết quả chi tiết -- RCNN (Best AUC = 0.9839)}
 \begin{table}
 \centering
 \small
@@ -380,22 +381,23 @@ Attn LSTM & 4.9M & 0.9289 & 0.4285 & 0.5655 & ~56s \\
 \toprule
 \textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
 \midrule
-toxic & 0.29 & 0.82 & 0.43 & 0.9071 \\
-severe\_toxic & 0.13 & 0.94 & 0.22 & 0.9910 \\
-obscene & 0.29 & 0.87 & 0.43 & 0.9486 \\
-threat & 0.02 & 0.50 & 0.04 & 0.9585 \\
-insult & 0.19 & 0.77 & 0.30 & 0.9168 \\
-identity\_hate & 0.08 & 0.59 & 0.14 & 0.9008 \\
+toxic & 0.62 & 0.89 & 0.73 & 0.9753 \\
+severe\_toxic & 0.25 & 0.96 & 0.40 & 0.9897 \\
+obscene & 0.76 & 0.87 & 0.81 & 0.9892 \\
+threat & 0.29 & 0.79 & 0.43 & 0.9878 \\
+insult & 0.55 & 0.92 & 0.69 & 0.9841 \\
+identity\_hate & 0.20 & 0.85 & 0.32 & 0.9776 \\
 \midrule
-\textbf{Macro Avg} & \textbf{0.17} & \textbf{0.75} & \textbf{0.26} & \textbf{0.9372} \\
+\textbf{Macro Avg} & \textbf{0.44} & \textbf{0.88} & \textbf{0.56} & \textbf{0.9839} \\
 \bottomrule
 \end{tabular}
 \end{table}
 \vspace{0.2cm}
-\textbf{Nhận xét:} Recall cao nhưng precision thấp $\rightarrow$ mô hình dự đoán quá nhiều positive (do class weights).
+\textbf{Với optimal thresholds:} F1 Macro = 0.63, F1 Micro = 0.74 \\
+\textbf{Nhận xét:} Precision cải thiện mạnh so với lần chạy trước (10K mẫu) -- dữ liệu lớn giúp mô hình học đặc trưng tốt hơn.
 \end{frame}
 
-\begin{frame}{Kết quả chi tiết -- Transformer}
+\begin{frame}{Kết quả chi tiết -- Attention BiLSTM (Best F1 Macro = 0.63)}
 \begin{table}
 \centering
 \small
@@ -403,22 +405,23 @@ identity\_hate & 0.08 & 0.59 & 0.14 & 0.9008 \\
 \toprule
 \textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
 \midrule
-toxic & 0.43 & 0.74 & 0.55 & 0.9134 \\
-severe\_toxic & 0.29 & 0.92 & 0.44 & 0.9842 \\
-obscene & 0.60 & 0.80 & 0.69 & 0.9570 \\
-threat & 0.01 & 0.20 & 0.03 & 0.8034 \\
-insult & 0.54 & 0.76 & 0.63 & 0.9414 \\
-identity\_hate & 0.12 & 0.71 & 0.21 & 0.9644 \\
+toxic & 0.67 & 0.87 & 0.76 & 0.9749 \\
+severe\_toxic & 0.29 & 0.91 & 0.44 & 0.9897 \\
+obscene & 0.62 & 0.94 & 0.75 & 0.9901 \\
+threat & 0.37 & 0.68 & 0.48 & 0.9816 \\
+insult & 0.54 & 0.92 & 0.68 & 0.9845 \\
+identity\_hate & 0.32 & 0.73 & 0.45 & 0.9800 \\
 \midrule
-\textbf{Macro Avg} & \textbf{0.33} & \textbf{0.69} & \textbf{0.42} & \textbf{0.9273} \\
+\textbf{Macro Avg} & \textbf{0.47} & \textbf{0.84} & \textbf{0.59} & \textbf{0.9834} \\
 \bottomrule
 \end{tabular}
 \end{table}
 \vspace{0.2cm}
-\textbf{Nhận xét:} \red{Precision cao nhất} trong tất cả mô hình (F1 Macro = 0.49) $\rightarrow$ cân bằng tốt nhất giữa precision và recall.
+\textbf{Với optimal thresholds:} F1 Macro = 0.65, F1 Micro = 0.75 \\
+\textbf{Nhận xét:} \red{F1 Macro cao nhất} -- attention giúp cân bằng precision/recall tốt hơn so với mean pooling.
 \end{frame}
 
-\begin{frame}{Kết quả chi tiết -- GRU}
+\begin{frame}{Kết quả chi tiết -- BiLSTM}
 \begin{table}
 \centering
 \small
@@ -426,50 +429,52 @@ identity\_hate & 0.12 & 0.71 & 0.21 & 0.9644 \\
 \toprule
 \textbf{Nhãn} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{AUC} \\
 \midrule
-toxic & 0.44 & 0.85 & 0.58 & 0.9334 \\
-severe\_toxic & 0.21 & 0.93 & 0.35 & 0.9798 \\
-obscene & 0.42 & 0.86 & 0.56 & 0.9626 \\
-threat & 0.04 & 0.75 & 0.07 & 0.8513 \\
-insult & 0.36 & 0.83 & 0.50 & 0.9478 \\
-identity\_hate & 0.14 & 0.68 & 0.23 & 0.9458 \\
+toxic & 0.60 & 0.89 & 0.71 & 0.9736 \\
+severe\_toxic & 0.21 & 0.97 & 0.35 & 0.9880 \\
+obscene & 0.58 & 0.94 & 0.72 & 0.9898 \\
+threat & 0.13 & 0.73 & 0.22 & 0.9734 \\
+insult & 0.48 & 0.93 & 0.63 & 0.9812 \\
+identity\_hate & 0.14 & 0.84 & 0.23 & 0.9741 \\
 \midrule
-\textbf{Macro Avg} & \textbf{0.27} & \textbf{0.82} & \textbf{0.38} & \textbf{0.9368} \\
+\textbf{Macro Avg} & \textbf{0.36} & \textbf{0.88} & \textbf{0.48} & \textbf{0.9800} \\
 \bottomrule
 \end{tabular}
 \end{table}
 \vspace{0.2cm}
-\textbf{Nhận xét:} F1 Macro cao thứ 2 (0.48) -- hiệu quả tốt với ít tham số nhất (4.6M).
+\textbf{Với optimal thresholds:} F1 Macro = 0.58, F1 Micro = 0.71 \\
+\textbf{Nhận xét:} Recall rất cao (0.88) nhưng precision thấp hơn Attention BiLSTM $\rightarrow$ chứng tỏ attention thực sự giúp lọc nhiễu.
 \end{frame}
 
 \begin{frame}{Nhận xét chung}
 \begin{itemize}
-    \item \textbf{RCNN đạt AUC cao nhất (0.966):} Kiến trúc kết hợp Bi-directional + embedding + max pooling giúp trích xuất đặc trưng hiệu quả
-    \item \textbf{Transformer có F1 Macro tốt nhất (0.49):} Precision cao nhất $\rightarrow$ ít false positive, cân bằng tốt
-    \item \textbf{GRU hiệu quả nhất về tham số:} F1 Macro 0.48 với chỉ 4.6M params
-    \item \textbf{Attention không cải thiện đáng kể:} Có thể do dữ liệu nhỏ (10K mẫu) hoặc cần tuning thêm
-    \item \textbf{Vấn đề chung:} Recall cao nhưng precision thấp $\rightarrow$ class weights vẫn quá mạnh với một số lớp
-    \item \textbf{Threat luôn khó nhất:} Quá ít mẫu (~320/159K), AUC thấp nhất ở mọi mô hình
+    \item \textbf{Cải thiện vượt trội so với 10K mẫu:} AUC tăng từ ~0.95 $\rightarrow$ ~0.98, F1 Macro tăng từ ~0.43 $\rightarrow$ ~0.63
+    \item \textbf{Attention BiLSTM đạt F1 Macro tốt nhất (0.63):} Attention giúp cân bằng precision/recall tốt hơn mean pooling
+    \item \textbf{RCNN đạt AUC cao nhất (0.984):} Kiến trúc Bi-directional + embedding fusion + max pooling rất hiệu quả
+    \item \textbf{Attention thực sự có ích:} Attention BiLSTM (0.63) > BiLSTM (0.55), Attention LSTM (0.57) > LSTM (0.55)
+    \item \textbf{Transformer chậm hội tụ:} F1 Macro thấp nhất (0.46) -- có thể cần nhiều epoch hơn hoặc learning rate nhỏ hơn
+    \item \textbf{Vấn đề còn tồn tại:} Precision vẫn thấp ở các lớp thiểu số (threat: 0.29-0.37, identity\_hate: 0.20-0.32)
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Hướng phát triển}
 \begin{itemize}
-    \item \textbf{Dữ liệu:} Sử dụng toàn bộ 159K mẫu (hiện tại chỉ 10K do giới hạn thời gian)
     \item \textbf{Pretrained embeddings:} GloVe, FastText thay vì embedding ngẫu nhiên
-    \item \textbf{Fine-tune class weights:} Tìm trọng số tối ưu thay vì ratio đơn thuần
-    \item \textbf{Ensemble:} Kết hợp predictions từ nhiều mô hình
+    \item \textbf{Fine-tune class weights:} Tìm trọng số tối ưu thay vì ratio đơn thuần + clip
+    \item \textbf{Ensemble:} Kết hợp predictions từ Attention BiLSTM + RCNN
     \item \textbf{Data augmentation:} Back-translation, synonym replacement cho lớp thiểu số
-    \item \textbf{Hyperparameter tuning:} Grid search / Bayesian optimization
+    \item \textbf{Hyperparameter tuning:} Grid search / Bayesian optimization cho từng mô hình
+    \item \textbf{Transformer tuning:} Tăng số epoch, giảm learning rate, tăng số head
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Kết luận}
 \begin{itemize}
     \item Đã cài đặt từ gốc \textbf{7 mô hình} deep learning cho phân loại văn bản
-    \item \textbf{RCNN} đạt ROC-AUC cao nhất (0.966), \textbf{Transformer} có F1 Macro tốt nhất (0.49)
-    \item Các phương pháp tối ưu (AdamW, Gradient Clipping, LR Scheduler, Class Weights) giúp mô hình hội tụ ổn định
+    \item \textbf{RCNN} đạt ROC-AUC cao nhất (0.984), \textbf{Attention BiLSTM} có F1 Macro tốt nhất (0.63)
+    \item Full data (159K) cải thiện vượt trội so với 10K mẫu: AUC +0.02, F1 Macro +0.20
+    \item Các phương pháp tối ưu (AdamW, Gradient Clipping, LR Scheduler, Class Weights, Optimal Thresholds) giúp mô hình hội tụ ổn định
     \item \textbf{Thách thức chính:} Mất cân bằng lớp nghiêm trọng $\rightarrow$ precision thấp ở các lớp thiểu số
-    \item Cần thêm dữ liệu và fine-tuning để cải thiện kết quả
+    \item Cần pretrained embeddings và fine-tuning để cải thiện thêm
 \end{itemize}
 \end{frame}
 
