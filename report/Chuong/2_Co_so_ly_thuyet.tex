@@ -1,0 +1,412 @@
+\documentclass[../BTL.tex]{subfiles}
+
+\begin{document}
+
+\section{Xử lý dữ liệu văn bản}
+Việc xử lý dữ liệu văn bản đóng vai trò nền tảng trong bất kỳ bài toán xử lý ngôn ngữ tự nhiên nào, bao gồm cả bài toán phân loại bình luận độc hại. Theo cuốn sách "Modern Information Retrieval" của Baeza-Yates và Ribeiro-Neto (1999), tiền xử lý văn bản là bước quan trọng để chuẩn hóa dữ liệu đầu vào và loại bỏ nhiễu, giúp cải thiện đáng kể chất lượng của các mô hình phân loại~\cite{baeza-yates1999modern}.
+
+Quá trình tokenize bắt đầu bằng việc chuyển đổi văn bản gốc thành danh sách các token IDs, đồng thời tạo ra attention mask để đánh dấu các token thực sự so với các token padding. Mỗi câu được thêm các token đặc biệt là [CLS] (classification) ở đầu và [SEP] (separator) ở cuối để phân tách các câu khi cần thiết. Độ dài tối đa của chuỗi được giới hạn ở 128 tokens, giúp cân bằng giữa khả năng nắm bắt ngữ cảnh và tốc độ huấn luyện. Attention mask sẽ có giá trị 1 cho các token thực và 0 cho các token padding, cho phép mô hình bỏ qua phần padding khi tính toán.
+
+Trong bài toán phân loại đa nhãn, mỗi bình luận được gán nhãn bởi 6 cột binary tương ứng với 6 loại độc hại: toxic, severe\_toxic, obscene, threat, insult, và identity\_hate. Điều đáng chú ý là một bình luận có thể đồng thời thuộc nhiều nhãn. Điều này phân biệt bài toán multi-label classification với multi-class classification, đòi hỏi việc sử dụng Binary Cross-Entropy loss thay vì Categorical Cross-Entropy~\cite{goodfellow2016deep}. Hàm mất mát BCEWithLogitsLoss được tính như sau:
+
+\begin{equation}
+    \mathcal{L}_{BCE} = -\frac{1}{N \times C} \sum_{i=1}^{N} \sum_{c=1}^{C} \left[ y_{ic} \log(\sigma(x_{ic})) + (1 - y_{ic}) \log(1 - \sigma(x_{ic})) \right]
+\end{equation}
+
+Trong đó $N$ là số mẫu, $C$ là số lớp (6), $y_{ic}$ là nhãn thực của mẫu $i$ lớp $c$, $x_{ic}$ là logits đầu ra của mô hình, và $\sigma$ là hàm sigmoid. Khi sử dụng class weights (pos\_weight), công thức trở thành:
+
+\begin{equation}
+    \mathcal{L}_{BCE}^{weighted} = -\frac{1}{N \times C} \sum_{i=1}^{N} \sum_{c=1}^{C} w_c \left[ y_{ic} \log(\sigma(x_{ic})) + (1 - y_{ic}) \log(1 - \sigma(x_{ic})) \right]
+\end{equation}
+
+Với $w_c$ là trọng số của lớp $c$, được tính bằng tỷ lệ $\frac{\text{số mẫu âm}_c}{\text{số mẫu dương}_c}$.
+
+\section{Các mô hình Deep Learning}
+
+\subsection{Long Short-Term Memory (LSTM)}
+Mạng Long Short-Term Memory (LSTM) là một biến thể của mạng RNN (Recurrent Neural Network) được giới thiệu bởi Hochreiter và Schmidhuber vào năm 1997, nhằm giải quyết hai vấn đề cơ bản của RNN truyền thống: vanishing gradient và exploding gradient~\cite{hochreiter1997lstm}. Khi chuỗi đầu vào quá dài, gradient trong quá trình backpropagation through time (BPTT) có xu hướng giảm rất nhanh hoặc tăng rất nhanh, khiến mô hình không thể học được các phụ thuộc từ xa trong chuỗi.
+
+Kiến trúc cốt lõi của LSTM dựa trên khái niệm cell state (trạng thái ô), đóng vai trò như một "băng truyền" cho phép thông tin chảy dọc theo chuỗi mà hầu như không bị thay đổi. Cell state được điều khiển bởi ba cổng (gates): Forget Gate, Input Gate, và Output Gate.
+
+Các công thức toán học của LSTM được biểu diễn như sau:
+
+\begin{equation}
+    f_t = \sigma(W_{hf} h_{t-1} + W_{xf} x_t + b_f) \quad \text{(Forget Gate)}
+\end{equation}
+
+Forget Gate quyết định thông tin nào từ cell state trước đó cần được loại bỏ. Hàm sigmoid $\sigma$ đưa ra giá trị trong khoảng [0,1], trong đó 0 có nghĩa là "loại bỏ hoàn toàn" và 1 có nghĩa là "giữ lại hoàn toàn".
+
+\begin{equation}
+    i_t = \sigma(W_{hi} h_{t-1} + W_{xi} x_t + b_i) \quad \text{(Input Gate)}
+\end{equation}
+
+Input Gate quyết định thông tin mới nào sẽ được thêm vào cell state.
+
+\begin{equation}
+    \tilde{c}_t = \tanh(W_{hc} h_{t-1} + W_{xc} x_t + b_c) \quad \text{(Candidate Cell State)}
+\end{equation}
+
+Candidate Cell State tạo ra các giá trị ứng viên để thêm vào cell state. Hàm tanh đưa ra giá trị trong khoảng [-1,1], cho phép cả giá trị dương và âm.
+
+\begin{equation}
+    c_t = f_t \odot c_{t-1} + i_t \odot \tilde{c}_t \quad \text{(Cell State Update)}
+\end{equation}
+
+Cell State mới được cập nhật bằng cách kết hợp thông tin cũ (được điều khiển bởi Forget Gate) và thông tin mới (được điều khiển bởi Input Gate). Toán tử $\odot$ là phép nhân Hadamard (element-wise).
+
+\begin{equation}
+    o_t = \sigma(W_{ho} h_{t-1} + W_{xo} x_t + b_o) \quad \text{(Output Gate)}
+\end{equation}
+
+Output Gate quyết định phần nào của cell state sẽ được xuất ra.
+
+\begin{equation}
+    h_t = o_t \odot \tanh(c_t) \quad \text{(Hidden State)}
+\end{equation}
+
+Hidden State mới là kết quả của việc nhân Output Gate với tanh của Cell State, quyết định thông tin nào được truyền ra ngoài.
+
+Trong đề tài này, LSTM được cài đặt từ gốc sử dụng các tham số nn.Parameter và các phép toán ma trận cơ bản. Mô hình bao gồm một lớp Embedding chuyển đổi token IDs thành các vector có chiều EMBEDDING\_DIM, tiếp theo là các tầng LSTM xử lý tuần tự từng token, và cuối cùng là Global Average Pooling để tổng hợp hidden states từ tất cả các time steps thành một vector duy nhất:
+
+\begin{equation}
+    \bar{h} = \frac{1}{T} \sum_{t=1}^{T} h_t
+\end{equation}
+
+\subsection{Bidirectional LSTM (BiLSTM)}
+Bidirectional LSTM (BiLSTM) là một mở rộng của LSTM, cho phép xử lý chuỗi đầu vào theo cả hai hướng cùng lúc: từ trái sang phải (forward) và từ phải sang trái (backward)~\cite{graves2012supervised}. Ý tưởng cốt lõi là mỗi từ trong câu không chỉ phụ thuộc vào ngữ cảnh đứng trước nó mà còn phụ thuộc vào ngữ cảnh đứng sau nó. Ví dụ trong câu "I don't hate this movie", từ "hate" mang nghĩa tiêu cực, nhưng trong ngữ cảnh đầy đủ "don't hate" lại mang nghĩa tích cực.
+
+Về mặt kỹ thuật, BiLSTM bao gồm hai mạng LSTM chạy song song. Công thức tính hidden state của BiLSTM tại mỗi vị trí $t$:
+
+\begin{equation}
+    \overrightarrow{h_t} = \text{LSTM}_{\rightarrow}(x_t, \overrightarrow{h_{t-1}}) \quad \text{(Forward)}
+\end{equation}
+
+\begin{equation}
+    \overleftarrow{h_t} = \text{LSTM}_{\leftarrow}(x_t, \overleftarrow{h_{t+1}}) \quad \text{(Backward)}
+\end{equation}
+
+\begin{equation}
+    h_t = [\overrightarrow{h_t}; \overleftarrow{h_t}] \quad \text{(Concatenation)}
+\end{equation}
+
+Hidden state của BiLSTM được tạo bằng cách concatenate hidden state từ forward LSTM và hidden state từ backward LSTM tại vị trí đó. Do đó, kích thước hidden state của BiLSTM gấp đôi so với LSTM thông thường: $\text{hidden\_dim}_{BiLSTM} = 2 \times \text{hidden\_dim}_{LSTM}$.
+
+Pooling cuối cùng sử dụng Global Average Pooling để tổng hợp thông tin từ tất cả các time steps. Với BiLSTM, mỗi hidden state đã có chiều gấp đôi, nên vector đầu ra sau pooling có kích thước $\text{hidden\_size} \times 2$.
+
+\subsection{Gated Recurrent Unit (GRU)}
+Gated Recurrent Unit (GRU) là một biến thể khác của RNN, được đề xuất bởi Cho vào năm 2014 trong bài báo về RNN Encoder-Decoder cho dịch máy thống kê~\cite{cho2014gru}, với thiết kế đơn giản hóa hơn so với LSTM. GRU sử dụng ít cổng hơn (chỉ 2 cổng thay vì 3) và không sử dụng cell state riêng biệt, chỉ dùng hidden state duy nhất, giúp giảm số lượng tham số cần học khoảng 25\%.
+
+Các công thức toán học của GRU:
+
+\begin{equation}
+    z_t = \sigma(W_{hz} h_{t-1} + W_{xz} x_t + b_z) \quad \text{(Update Gate)}
+\end{equation}
+
+Update Gate $z_t$ kết hợp vai trò của Forget Gate và Input Gate trong LSTM. Khi $z_t$ gần 1, mô hình giữ lại hầu hết thông tin cũ; khi $z_t$ gần 0, mô hình thêm nhiều thông tin mới.
+
+\begin{equation}
+    r_t = \sigma(W_{hr} h_{t-1} + W_{xr} x_t + b_r) \quad \text{(Reset Gate)}
+\end{equation}
+
+Reset Gate $r_t$ kiểm soát mức độ thông tin quá khứ cần được bỏ qua khi tính toán candidate hidden state mới. Nếu $r_t$ gần 0, mô hình bỏ qua hoàn toàn hidden state trước đó.
+
+\begin{equation}
+    \tilde{h}_t = \tanh(W_{hn}(r_t \odot h_{t-1}) + W_{xn} x_t + b_n) \quad \text{(Candidate Hidden State)}
+\end{equation}
+
+\begin{equation}
+    h_t = (1 - z_t) \odot \tilde{h}_t + z_t \odot h_{t-1} \quad \text{(Hidden State Update)}
+\end{equation}
+
+Hidden state mới là sự nội suy giữa candidate state và hidden state trước đó, được điều khiển bởi update gate. Công thức này cho phép mô hình linh hoạt quyết định bao nhiêu thông tin cũ cần được giữ lại.
+
+Ưu điểm chính của GRU so với LSTM là ít tham số hơn, dẫn đến huấn luyện nhanh hơn và ít nguy cơ overfitting hơn. Trong nhiều thử nghiệm thực tế, hiệu suất của GRU và LSTM thường tương đương nhau, và sự lựa chọn giữa hai kiến trúc phụ thuộc vào đặc điểm cụ thể của bài toán và dữ liệu.
+
+\subsection{Cơ chế Attention}
+Cơ chế Attention (chú ý) là một trong những đột phá quan trọng nhất trong lĩnh vực Deep Learning, được giới thiệu ban đầu trong bài toán dịch máy Neural Machine Translation bởi Bahdanau và cộng sự vào năm 2014~\cite{bahdanau2014attention}. Ý tưởng cốt lõi của Attention là thay vì dựa hoàn toàn vào hidden state cuối cùng để đại diện cho toàn bộ chuỗi (như trong RNN truyền thống), mô hình có thể "chú ý" (tập trung) vào các phần khác nhau của chuỗi đầu vào với mức độ khác nhau.
+
+Trong bài toán phân loại bình luận độc hại, không phải từ nào cũng quan trọng như nhau. Ví dụ trong câu "You are an idiot", từ "idiot" mang ý nghĩa quan trọng nhất để xác định bình luận là toxic, trong khi các từ như "are", "an" gần như không cung cấp thông tin hữu ích.
+
+Công thức toán học của Self-Attention được sử dụng trong đề tài:
+
+\begin{equation}
+    e_t = \tanh(W_a h_t + b_a) \quad \text{(Energy Score)}
+\end{equation}
+
+Bước đầu tiên tính energy scores $e_t$ cho mỗi time step, trong đó $h_t$ là hidden state tại time step $t$ và $W_a$ là ma trận trọng số có thể huấn luyện. Energy score đại diện cho mức độ "quan trọng" của mỗi time step.
+
+\begin{equation}
+    \alpha_t = \frac{\exp(e_t)}{\sum_{k=1}^{T} \exp(e_k)} = \text{softmax}(e_t) \quad \text{(Attention Weights)}
+\end{equation}
+
+Attention weights $\alpha_t$ được tính bằng softmax của các energy scores, đảm bảo tổng các trọng số bằng 1 ($\sum_{t=1}^{T} \alpha_t = 1$). Điều này cho phép interpretability: ta có thể biết được mô hình đang tập trung vào phần nào của văn bản.
+
+\begin{equation}
+    c = \sum_{t=1}^{T} \alpha_t h_t \quad \text{(Context Vector)}
+\end{equation}
+
+Context vector $c$ là tổng có trọng số của tất cả hidden states. Context vector này được sử dụng thay cho mean pooling hoặc hidden state cuối cùng làm đầu vào cho lớp phân loại. Điểm khác biệt chính so với mean pooling ($\bar{h} = \frac{1}{T} \sum h_t$) là attention cho phép mô hình học để tập trung vào các phần quan trọng.
+
+Yang và cộng sự (2016) đã phát triển kiến trúc Hierarchical Attention Networks sử dụng attention ở nhiều cấp độ và đạt kết quả ấn tượng trên bài toán phân loại văn bản~\cite{yang2016hierarchical}.
+
+\subsection{Attention BiLSTM}
+Attention BiLSTM là sự kết hợp giữa kiến trúc BiLSTM và cơ chế Attention, tận dụng ưu điểm của cả hai. BiLSTM cung cấp khả năng nắm bắt ngữ cảnh hai chiều, trong khi Attention cho phép mô hình tập trung vào các từ quan trọng nhất khi đưa ra quyết định phân loại.
+
+Trong mô hình này, đầu ra của BiLSTM là một chuỗi các hidden states (mỗi hidden state có chiều gấp đôi do concatenate hai hướng), sau đó Self-Attention được áp dụng lên chuỗi này để tạo ra một context vector duy nhất đại diện cho toàn bộ câu. Attention weights được tính dựa trên các hidden states từ BiLSTM, cho phép mô hình học được tổ hợp ngữ cảnh hai chiều của từng từ trước khi quyết định mức độ quan trọng.
+
+Mô hình Attention BiLSTM đạt được kết quả F1 Macro tốt nhất trong số tất cả các mô hình được thử nghiệm, chứng tỏ rằng sự kết hợp giữa ngữ cảnh hai chiều và cơ chế attention thực sự mang lại hiệu quả vượt trội. Attention giúp cải thiện đáng kể precision (từ 0.36 lên 0.47) trong khi vẫn duy trì recall ở mức cao (0.84), cho thấy mô hình đã học được cách phân biệt tốt hơn giữa các trường hợp thực sự thuộc nhãn độc hại và các trường hợp dương tính giả.
+
+Số lượng tham số của Attention BiLSTM là 6.5 triệu, gần tương đương với BiLSTM cơ bản (6.3 triệu), cho thấy attention layer chỉ thêm một lượng nhỏ tham số nhưng mang lại cải thiện đáng kể về hiệu suất.
+
+\subsection{Recurrent Convolutional Neural Network (RCNN)}
+RCNN (Recurrent Convolutional Neural Network) là kiến trúc kết hợp giữa RNN và CNN, được đề xuất bởi Lai và cộng sự vào năm 2015 cho bài toán phân loại văn bản tại hội nghị AAAI~\cite{lai2015rcnn}. Ý tưởng cốt lõi của RCNN là sử dụng BiLSTM để thu thập ngữ cảnh hai chiều cho mỗi từ, sau đó kết hợp ngữ cảnh đó với embedding gốc của từ để tạo ra biểu diễn phong phú hơn, rồi cuối cùng sử dụng Max Pooling thay vì Average Pooling để trích xuất các đặc trưng quan trọng nhất.
+
+Kiến trúc RCNN trong đề tài bao gồm các bước sau:
+
+\textbf{Bước 1: BiLSTM tạo ngữ cảnh hai chiều}
+\begin{equation}
+    c_L(t) = \overrightarrow{h_t} \quad \text{(Ngữ cảnh trái tại vị trí } t\text{)}
+\end{equation}
+\begin{equation}
+    c_R(t) = \overleftarrow{h_t} \quad \text{(Ngữ cảnh phải tại vị trí } t\text{)}
+\end{equation}
+
+\textbf{Bước 2: Concatenate ngữ cảnh với embedding}
+\begin{equation}
+    x_t^{combined} = [c_L(t); e_t; c_R(t)] \quad \text{(Biểu diễn kết hợp)}
+\end{equation}
+
+Vector biểu diễn tại mỗi vị trí được tạo bằng cách concatenate ngữ cảnh trái, embedding gốc, và ngữ cảnh phải. Kích thước của vector này là: $\text{dim}(c_L) + \text{dim}(e_t) + \text{dim}(c_R) = 2 \times \text{hidden\_size} + \text{embedding\_dim}$.
+
+\textbf{Bước 3: Fusion layer với tanh}
+\begin{equation}
+    y_t = \tanh(W_f \cdot x_t^{combined} + b_f) \quad \text{(Fusion)}
+\end{equation}
+
+Fusion layer tích hợp các đặc trưng từ ba nguồn (ngữ cảnh trái, embedding, ngữ cảnh phải) thành một vector biểu diễn duy nhất cho mỗi vị trí.
+
+\textbf{Bước 4: Max Pooling}
+\begin{equation}
+    \hat{y} = \max_{t \in [1, T]} y_t \quad \text{(Global Max Pooling)}
+\end{equation}
+
+Global Max Pooling lấy giá trị lớn nhất theo chiều thời gian, giúp tập trung vào những đặc trưng nổi bật nhất. Max pooling đặc biệt hiệu quả khi các từ độc hại (như "fuck", "shit" cho obscene) xuất hiện rõ ràng và max pooling có thể dễ dàng chọn ra chúng.
+
+RCNN đạt được ROC-AUC cao nhất trong số tất cả các mô hình (0.9839), cho thấy khả năng xếp hạng các mẫu dương tính cao hơn các mẫu âm tính của mô hình này là tốt nhất. Đặc biệt, RCNN đạt hiệu suất rất cao trên nhãn obscene (F1 = 0.81 với optimal thresholds).
+
+Tuy nhiên, RCNN có số lượng tham số nhiều nhất (6.6 triệu) và F1 Macro của nó (0.5689) không cao bằng Attention BiLSTM (0.6311), cho thấy max pooling không cân bằng precision/recall tốt bằng attention.
+
+\subsection{Transformer Encoder}
+Transformer là kiến trúc được giới thiệu trong bài báo "Attention Is All You Need" của Vaswani và cộng sự vào năm 2017 tại hội nghị NeurIPS, đánh dấu một bước tiến lớn trong lĩnh vực xử lý ngôn ngữ tự nhiên~\cite{vaswani2017transformer}. Điểm khác biệt cốt lõi của Transformer so với các mô hình RNN là nó không sử dụng cơ chế tuần tự (sequential processing), mà thay vào đó xử lý toàn bộ chuỗi đầu vào song song trong một bước duy nhất.
+
+Do Transformer không xử lý tuần tự nên nó không có thông tin về vị trí của các từ trong câu một cách tự nhiên. Positional Encoding được sử dụng để bổ sung thông tin vị trí:
+
+\begin{equation}
+    PE_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i/d}}\right) \quad \text{(Vị trí chẵn)}
+\end{equation}
+\begin{equation}
+    PE_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i/d}}\right) \quad \text{(Vị trí lẻ)}
+\end{equation}
+
+Trong đó $pos$ là vị trí của từ, $i$ là chiều của embedding, và $d$ là tổng chiều của embedding. Các hàm sine và cosine với các tần số khác nhau tạo ra một vector duy nhất cho mỗi vị trí mà mô hình có thể học được.
+
+\textbf{Self-Attention} là cơ chế cốt lõi của Transformer. Công thức attention:
+
+\begin{equation}
+    \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\end{equation}
+
+Trong đó $Q$ (Query), $K$ (Key), và $V$ (Value) là ba ma trận được tính từ đầu vào: $Q = XW_Q$, $K = XW_K$, $V = XW_V$. Hệ số $\sqrt{d_k}$ trong mẫu số giúp ổn định gradient trong quá trình huấn luyện khi $d_k$ lớn.
+
+\textbf{Multi-Head Attention} chạy nhiều attention heads song song:
+
+\begin{equation}
+    \text{MultiHead}(Q, K, V) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W^O
+\end{equation}
+\begin{equation}
+    \text{head}_i = \text{Attention}(QW_Q^i, KW_K^i, VW_V^i)
+\end{equation}
+
+Mỗi head với một không gian con khác nhau, cho phép mô hình học các loại quan hệ khác nhau đồng thời: head này có thể học quan hệ ngữ pháp, head kia học quan hệ ngữ nghĩa, và một head khác học các mẫu phủ định.
+
+\textbf{Transformer Encoder Block} bao gồm hai thành phần chính với Residual Connection và Layer Normalization:
+
+\begin{equation}
+    x' = \text{LayerNorm}(x + \text{MultiHead}(x, x, x))
+\end{equation}
+\begin{equation}
+    x'' = \text{LayerNorm}(x' + \text{FFN}(x'))
+\end{equation}
+
+Trong đó Feed-Forward Network (FFN) gồm hai lớp tuyến tính với ReLU activation:
+\begin{equation}
+    \text{FFN}(x) = W_2 \cdot \text{ReLU}(W_1 \cdot x + b_1) + b_2
+\end{equation}
+
+Layer Normalization~\cite{ba2016layer} được tính như sau:
+\begin{equation}
+    \text{LayerNorm}(x) = \gamma \odot \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}} + \beta
+\end{equation}
+
+Trong đó $\mu = \frac{1}{d} \sum_{i=1}^{d} x_i$ và $\sigma^2 = \frac{1}{d} \sum_{i=1}^{d} (x_i - \mu)^2$ lần lượt là mean và variance của input. Các tham số $\gamma$ và $\beta$ là các tham số có thể học được.
+
+Kết quả của Transformer trong thử nghiệm cho thấy mô hình này đạt ROC-AUC ở mức 0.9789 nhưng F1 Macro thấp nhất trong tất cả các mô hình (0.4625). Nguyên nhân có thể bao gồm việc sử dụng embedding ngẫu nhiên thay vì pretrained embeddings~\cite{pennington2014glove,mikolov2013word2vec}, và cấu hình (2 layers, 8 heads) có thể chưa đủ mạnh.
+
+\section{Các phương pháp tối ưu hóa huấn luyện}
+
+\subsection{Xử lý dữ liệu mất cân bằng với Class-Weighted Loss}
+Một trong những thách thức lớn nhất của bài toán phân loại bình luận độc hại là sự mất cân bằng nghiêm trọng giữa các lớp. Theo phân tích dữ liệu từ bộ Jigsaw~\cite{kaggleJigsaw}, chỉ khoảng 9.4\% bình luận thuộc lớp toxic, trong khi các lớp thiểu số như threat chỉ chiếm khoảng 0.2\%.
+
+Để giải quyết vấn đề này, đề tài sử dụng Binary Cross-Entropy with Logits Loss (BCEWithLogitsLoss) với trọng số lớp (pos\_weight). Trọng số cho mỗi lớp được tính bằng:
+
+\begin{equation}
+    w_c = \frac{\text{số mẫu âm}_c}{\text{số mẫu dương}_c} = \frac{N - p_c}{p_c}
+\end{equation}
+
+Trong đó $p_c$ là số mẫu dương tính của lớp $c$ và $N$ là tổng số mẫu. Trọng số này nhân với loss của các mẫu dương, khiến việc bỏ sót một mẫu độc hại có chi phí cao hơn nhiều so với việc dự đoán sai một mẫu không độc hại.
+
+Để tránh trọng số quá lớn gây ra over-penalizing lớp đa số, đề tài áp dụng clipping:
+\begin{equation}
+    w_c^{clipped} = \min(w_c, 50)
+\end{equation}
+
+Các trọng số cuối cùng: toxic = 9.43, severe\_toxic = 50.00 (clip), obscene = 17.89, threat = 50.00 (clip), insult = 19.26, identity\_hate = 50.00 (clip).
+
+Lin và cộng sự (2017) đã nghiên cứu về Focal Loss như một phương pháp hiệu quả để xử lý dữ liệu mất cân bằng~\cite{lin2017focal}:
+
+\begin{equation}
+    \text{FL}(p_t) = -\alpha_t (1 - p_t)^\gamma \log(p_t)
+\end{equation}
+
+Trong đó $p_t$ là xác suất của lớp đúng, $\alpha_t$ là trọng số cân bằng, và $\gamma$ là focusing parameter. Focal Loss giảm trọng số của các mẫu dễ phân loại và tập trung vào các mẫu khó.
+
+Sokolova và Lapalme (2009) đã phân tích chi tiết các độ đo hiệu suất cho bài toán phân loại và nhận thấy rằng F1-score đặc biệt hữu ích khi dữ liệu mất cân bằng~\cite{sokolova2009systematic}:
+
+\begin{equation}
+    F1 = \frac{2 \times \text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+\begin{equation}
+    \text{Precision} = \frac{TP}{TP + FP}, \quad \text{Recall} = \frac{TP}{TP + FN}
+\end{equation}
+
+F1 Macro là trung bình F1 của các lớp: $F1_{macro} = \frac{1}{C} \sum_{c=1}^{C} F1_c$.
+
+\subsection{AdamW Optimizer với Weight Decay}
+Adam (Adaptive Moment Estimation) được giới thiệu bởi Kingma và Ba năm 2015~\cite{kingma2015adam}, kết hợp Momentum và RMSprop:
+
+\begin{equation}
+    m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t \quad \text{(First moment estimate)}
+\end{equation}
+\begin{equation}
+    v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2 \quad \text{(Second moment estimate)}
+\end{equation}
+\begin{equation}
+    \hat{m}_t = \frac{m_t}{1 - \beta_1^t}, \quad \hat{v}_t = \frac{v_t}{1 - \beta_2^t} \quad \text{(Bias correction)}
+\end{equation}
+\begin{equation}
+    \theta_t = \theta_{t-1} - \alpha \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} \quad \text{(Parameter update)}
+\end{equation}
+
+AdamW (Adam with Decoupled Weight Decay) được đề xuất bởi Loshchilov và Hutter năm 2017~\cite{loshchilov2017adamw}, tách biệt weight decay khỏi gradient update:
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \cdot \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} - \eta \cdot \lambda \cdot \theta_t
+\end{equation}
+
+Trong đó $\lambda$ là weight decay coefficient ($10^{-4}$ trong đề tài). Việc tách biệt weight decay giúp đảm bảo regularization effect nhất quán bất kể giá trị của adaptive terms.
+
+Weight decay (L2 regularization) đóng vai trò quan trọng trong việc ngăn chặn overfitting. Nó khuyến khích các weights có giá trị nhỏ, giúp cải thiện khả năng tổng quát hóa của mô hình~\cite{goodfellow2016deep}.
+
+Srivastava và cộng sự (2014) đã nghiên cứu về Dropout như một phương pháp regularization hiệu quả khác~\cite{srivastava2014dropout}. Trong đề tài, dropout với tỷ lệ 0.3 được áp dụng trước lớp fully connected cuối cùng để ngăn overfitting.
+
+\subsection{Gradient Clipping}
+Gradient Clipping là kỹ thuật quan trọng đặc biệt đối với các mô hình RNN. Trong quá trình backpropagation through time, gradient được nhân qua nhiều time steps liên tiếp, có thể dẫn đến exploding gradient.
+
+Kỹ thuật Gradient Clipping giới hạn giá trị của gradient bằng cách rescale nó nếu norm vượt quá ngưỡng:
+
+\begin{equation}
+    \text{if } \|g\|_2 > \text{max\_norm}: \quad g \leftarrow g \cdot \frac{\text{max\_norm}}{\|g\|_2}
+\end{equation}
+
+Trong đó $\|g\|_2 = \sqrt{\sum_i g_i^2}$ là L2 norm của gradient. Trong đề tài, max\_norm = 1.0 được sử dụng. Gradient clipping được áp dụng sau khi gọi loss.backward() và trước khi gọi optimizer.step().
+
+Graves và cộng sự (2012) đã áp dụng gradient clipping thành công trong các mạng RNN cho nhận dạng giọng nói và nhận thấy rằng kỹ thuật này đặc biệt quan trọng khi huấn luyện trên các chuỗi dài~\cite{graves2012supervised}.
+
+LeCun và cộng sự (1998) đã thảo luận chi tiết về các thủ thuật huấn luyện mạng nơ-ron, bao gồm tầm quan trọng của việc kiểm soát gradient để đảm bảo quá trình huấn luyện ổn định~\cite{lecun1998gradient}.
+
+\subsection{Warmup Cosine LR Scheduler}
+Learning rate là một trong những siêu tham số quan trọng nhất trong huấn luyện mô hình Deep Learning. Đề tài sử dụng Warmup Cosine LR Scheduler - sự kết hợp của hai chiến lược điều chỉnh learning rate.
+
+\textbf{Giai đoạn Warmup} (10\% tổng số steps đầu tiên):
+\begin{equation}
+    lr(t) = lr_{base} \cdot \frac{t}{T_{warmup}}, \quad 0 \leq t < T_{warmup}
+\end{equation}
+
+Learning rate tăng tuyến tính từ 0 lên $lr_{base}$ ($2 \times 10^{-3}$), giúp mô hình ổn định dần dần và tránh các cập nhật quá mạnh ở giai đoạn đầu.
+
+\textbf{Giai đoạn Cosine Decay} (90\% còn lại):
+\begin{equation}
+    lr(t) = lr_{min} + (lr_{max} - lr_{min}) \cdot \frac{1}{2}\left(1 + \cos\left(\pi \cdot \frac{t - T_{warmup}}{T_{total} - T_{warmup}}\right)\right)
+\end{equation}
+
+Learning rate giảm dần theo hàm cosine, với $lr_{min} = 0$ và $lr_{max} = lr_{base}$. Cosine decay duy trì learning rate ở mức trung bình trong thời gian dài hơn so với linear decay, cho phép mô hình có đủ thời gian để khám phá không gian tham số.
+
+Vaswani và cộng sự (2017) đã sử dụng thành công warmup schedule trong huấn luyện Transformer và nhận thấy rằng nó giúp ổn định quá trình huấn luyện trong giai đoạn đầu~\cite{vaswani2017transformer}.
+
+Loshchilov và Hutter (2017) đã nghiên cứu về SGDR (Stochastic Gradient Descent with Warm Restarts) và nhận thấy rằng việc sử dụng cosine annealing với warm restarts mang lại cải thiện đáng kể trong nhiều bài toán~\cite{loshchilov2017adamw}.
+
+\subsection{Early Stopping}
+Early Stopping là kỹ thuật regularization đơn giản nhưng hiệu quả, nhằm ngăn chặn overfitting bằng cách dừng quá trình huấn luyện khi validation metric không còn cải thiện.
+
+Đề tài sử dụng Early Stopping với cấu hình:
+\begin{itemize}
+    \item \textbf{patience} = 2 epochs
+    \item \textbf{mode} = 'max' (theo dõi ROC-AUC)
+    \item \textbf{Metric} = ROC-AUC (thay vì loss)
+\end{itemize}
+
+ROC-AUC (Receiver Operating Characteristic - Area Under Curve) đo lường khả năng phân biệt của mô hình giữa các lớp dương tính và âm tính:
+
+\begin{equation}
+    \text{AUC} = \int_0^1 \text{TPR}(t) \, d\text{FPR}(t)
+\end{equation}
+
+Trong đó TPR (True Positive Rate) = Recall và FPR (False Positive Rate) = $\frac{FP}{FP + TN}$. AUC bằng 0.5 có nghĩa là dự đoán ngẫu nhiên, và AUC bằng 1.0 có nghĩa là phân loại hoàn hảo~\cite{fawcett2006introduction}.
+
+Lý do sử dụng ROC-AUC thay vì loss là vì loss có thể bị ảnh hưởng bởi class weights, trong khi ROC-AUC đo lường khả năng phân biệt thực sự của mô hình một cách threshold-independent. Raschka (2018) đã thảo luận chi tiết về tầm quan trọng của việc sử dụng các metric phù hợp để tránh overfitting~\cite{raschka2018roc}.
+
+Thuật toán Early Stopping:
+\begin{algorithm}[H]
+\DontPrintSemicolon
+\KwIn{patience $p$, best\_score, current\_score}
+\If{current\_score > best\_score}{
+    best\_score $\leftarrow$ current\_score\;
+    patience\_counter $\leftarrow$ 0\;
+    Lưu model checkpoint\;
+}
+\Else{
+    patience\_counter $\leftarrow$ patience\_counter + 1\;
+    \If{patience\_counter $\geq$ p}{
+        Khôi phục model từ checkpoint tốt nhất\;
+        Dừng huấn luyện\;
+    }
+}
+\end{algorithm}
+
+Wolpert (1997) đã chứng minh No Free Lunch Theorems, cho thấy rằng không có thuật toán tối ưu nhất cho mọi bài toán~\cite{wolpert1997no}. Early Stopping là một ví dụ về việc áp dụng nguyên tắc này trong thực tế.
+
+\subsection{Tìm kiếm Optimal Thresholds}
+Trong phân loại đa nhãn với đầu ra là xác suất từ sigmoid function, ngưỡng mặc định (threshold) để chuyển đổi xác suất thành nhãn nhị phân thường là 0.5. Tuy nhiên, với dữ liệu mất cân bằng, ngưỡng 0.5 không phải lúc nào cũng tối ưu.
+
+Đề tài áp dụng kỹ thuật tìm kiếm optimal threshold riêng biệt cho từng lớp:
+\begin{equation}
+    \theta_c^* = \arg\max_{\theta \in [0.1, 0.9]} F1_c(\theta)
+\end{equation}
+
+Với mỗi lớp $c$, duyệt qua các giá trị threshold từ 0.1 đến 0.9 với bước nhảy 0.01 và chọn threshold tối ưu dựa trên F1-score cao nhất. Phương pháp này cho phép mỗi lớp có một ngưỡng riêng phù hợp với phân phối và đặc điểm của lớp đó.
+
+Kết quả cho thấy các optimal thresholds thường cao hơn 0.5 đáng kể (từ 0.62 đến 0.89), cho thấy mô hình có xu hướng đưa ra xác suất khá cao cho cả các mẫu không độc hại. Việc tăng threshold giúp lọc bớt các false positives và cải thiện precision.
+
+Fawcett (2006) đã thảo luận chi tiết về tầm quan trọng của việc lựa chọn threshold phù hợp trong các bài toán phân loại và cách nó ảnh hưởng đến ROC curve và các độ đo hiệu suất khác nhau~\cite{fawcett2006introduction}.
+
+\end{document}
