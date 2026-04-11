@@ -76,20 +76,20 @@ class EarlyStopping:
         elif current_score < self.best_score + self.min_delta:
             # No improvement
             self.counter += 1
-            if self.verbose:
-                print(f"  ⏳ EarlyStopping: {self.counter}/{self.patience} (no improvement)")
+                if self.verbose:
+                    print(f"  EarlyStopping: {self.counter}/{self.patience} (no improvement)")
             if self.counter >= self.patience:
                 self.early_stop = True
                 if self.verbose:
-                    print(f"  🛑 EarlyStopping triggered! Restoring best model...")
+                    print(f"  EarlyStopping triggered! Restoring best model...")
                 self._restore_checkpoint(model)
         else:
             # Improvement found
             if self.verbose:
                 if self.mode == 'min':
-                    print(f"  ✅ EarlyStopping: val_loss improved ({-self.best_score:.4f} → {-current_score:.4f})")
+                    print(f"  EarlyStopping: val_loss improved ({-self.best_score:.4f} → {-current_score:.4f})")
                 else:
-                    print(f"  ✅ EarlyStopping: metric improved ({self.best_score:.4f} → {current_score:.4f})")
+                    print(f"  EarlyStopping: metric improved ({self.best_score:.4f} → {current_score:.4f})")
             self.best_score = current_score
             self.counter = 0
             self._save_checkpoint(model)

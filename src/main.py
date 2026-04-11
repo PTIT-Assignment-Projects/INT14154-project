@@ -9,18 +9,53 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 from src.constant import (
-    TRAIN_CSV_PATH, TEST_CSV_PATH, SUBMISSION_CSV_PATH,
+    TRAIN_CSV_PATH,
+    TEST_CSV_PATH,
+    SUBMISSION_CSV_PATH,
     LABEL_COLUMNS,
-    LSTM_MODEL_PATH, BILSTM_MODEL_PATH,
-    ATTENTION_BILSTM_MODEL_PATH, BATCH_SIZE, MAX_LEN, EMBEDDING_DIM, HIDDEN_SIZE, NUM_LAYERS,
-    DROPOUT, LEARNING_RATE, EPOCHS, BILSTM_MODEL, ATTENTION_BILSTM_MODEL, GRU_MODEL, GRU_MODEL_PATH, RCNN_MODEL_PATH,
-    RCNN_MODEL, LSTM_MODEL, TRANSFORMER_MODEL, TRANSFORMER_MODEL_PATH,
-    WEIGHT_DECAY, WARMUP_RATIO, EARLY_STOPPING_PATIENCE, GRADIENT_CLIP_MAX_NORM
+    LSTM_MODEL_PATH,
+    BILSTM_MODEL_PATH,
+    ATTENTION_BILSTM_MODEL_PATH,
+    BATCH_SIZE,
+    MAX_LEN,
+    EMBEDDING_DIM,
+    HIDDEN_SIZE,
+    NUM_LAYERS,
+    DROPOUT,
+    LEARNING_RATE,
+    EPOCHS,
+    BILSTM_MODEL,
+    ATTENTION_BILSTM_MODEL,
+    GRU_MODEL,
+    GRU_MODEL_PATH,
+    RCNN_MODEL_PATH,
+    RCNN_MODEL,
+    LSTM_MODEL,
+    TRANSFORMER_MODEL,
+    TRANSFORMER_MODEL_PATH,
+    WEIGHT_DECAY,
+    WARMUP_RATIO,
+    EARLY_STOPPING_PATIENCE,
+    GRADIENT_CLIP_MAX_NORM,
+    MAX_CLASS_WEIGHT,
 )
 from src.preprocessing import TextProcessor
 from src.custom_dataset.toxic_dataset import ToxicDataset
-from src.models import OwnLSTM, OwnBiLSTM, AttentionBiLSTM, OwnGRU, OwnRCNN, OwnTransformer
-from src.utils import compute_metrics, print_classification_report, EarlyStopping, WarmupCosineScheduler
+from src.models import (
+    OwnLSTM,
+    OwnBiLSTM,
+    AttentionBiLSTM,
+    OwnGRU,
+    OwnRCNN,
+    OwnTransformer,
+)
+from src.utils import (
+    compute_metrics,
+    print_classification_report,
+    EarlyStopping,
+    WarmupCosineScheduler,
+    find_optimal_thresholds,
+)
 
 
 def generate_submission(model, processor, device, submission_path):
@@ -36,8 +71,8 @@ def generate_submission(model, processor, device, submission_path):
 
     with torch.no_grad():
         for batch in tqdm(test_loader, desc="Predicting"):
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
 
             logits = model(input_ids, attention_mask)
             probs = torch.sigmoid(logits)
@@ -46,7 +81,7 @@ def generate_submission(model, processor, device, submission_path):
     all_preds = torch.cat(all_preds, dim=0).numpy()
 
     submission_df = pd.DataFrame(all_preds, columns=LABEL_COLUMNS)
-    submission_df.insert(0, 'id', test_df['id'].values)
+    submission_df.insert(0, "id", test_df["id"].values)
 
     submission_df.to_csv(submission_path, index=False)
     print(f"Submission file saved as '{submission_path}'.")
@@ -68,9 +103,9 @@ def evaluate_model(model, data_loader, criterion, device):
 
     with torch.no_grad():
         for batch in data_loader:
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["labels"].to(device)
 
             logits = model(input_ids, attention_mask)
             loss = criterion(logits, labels)
@@ -108,9 +143,14 @@ def compute_class_weights(df, label_columns):
     """
     pos_counts = df[label_columns].sum()
     neg_counts = len(df) - pos_counts
-    pos_weights = neg_counts / pos_counts.clip(lower=1)  # clip to avoid division by zero
+    pos_weights = neg_counts / pos_counts.clip(
+        lower=1
+    )  # clip to avoid division by zero
 
-    print("\nClass weights (pos_weight):")
+    # Clip extreme weights to prevent over-penalizing majority class
+    pos_weights = pos_weights.clip(upper=MAX_CLASS_WEIGHT)
+
+    print("\nClass weights applied to handle highly imbalanced data:")
     for name, weight in zip(label_columns, pos_weights):
         print(f"  {name:20s}: {weight:.2f}")
 
@@ -119,7 +159,7 @@ def compute_class_weights(df, label_columns):
 
 def train_model(model_type="bilstm"):
     # ========== 0. Configuration ==========
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # Ensure directories exist
@@ -154,7 +194,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = BILSTM_MODEL_PATH
     elif model_type == ATTENTION_BILSTM_MODEL:
@@ -164,7 +204,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = ATTENTION_BILSTM_MODEL_PATH
     elif model_type == GRU_MODEL:
@@ -174,7 +214,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = GRU_MODEL_PATH
     elif model_type == RCNN_MODEL:
@@ -184,7 +224,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = RCNN_MODEL_PATH
     elif model_type == TRANSFORMER_MODEL:
@@ -194,7 +234,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = TRANSFORMER_MODEL_PATH
     elif model_type == LSTM_MODEL:
@@ -204,7 +244,7 @@ def train_model(model_type="bilstm"):
             hidden_size=HIDDEN_SIZE,
             num_layers=NUM_LAYERS,
             num_classes=len(LABEL_COLUMNS),
-            dropout=DROPOUT
+            dropout=DROPOUT,
         ).to(device)
         model_path = LSTM_MODEL_PATH
     else:
@@ -227,11 +267,17 @@ def train_model(model_type="bilstm"):
     # NEW: Learning Rate Scheduler (Warmup + Cosine Annealing)
     total_steps = len(train_loader) * EPOCHS
     warmup_steps = int(WARMUP_RATIO * total_steps)
-    scheduler = WarmupCosineScheduler(optimizer, warmup_steps=warmup_steps, total_steps=total_steps)
-    print(f"LR Schedule: warmup for {warmup_steps} steps, then cosine decay over {total_steps} total steps")
+    scheduler = WarmupCosineScheduler(
+        optimizer, warmup_steps=warmup_steps, total_steps=total_steps
+    )
+    print(
+        f"LR Schedule: warmup for {warmup_steps} steps, then cosine decay over {total_steps} total steps"
+    )
 
-    # NEW: Early Stopping
-    early_stopper = EarlyStopping(patience=EARLY_STOPPING_PATIENCE, mode='min', verbose=True)
+    # NEW: Early Stopping (monitoring ROC-AUC, so mode='max')
+    early_stopper = EarlyStopping(
+        patience=EARLY_STOPPING_PATIENCE, mode="max", verbose=True
+    )
 
     # ========== 6. Training Loop ==========
     print(f"\nStarting training for {model_type}...")
@@ -244,11 +290,11 @@ def train_model(model_type="bilstm"):
         model.train()
         total_loss = 0
 
-        loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS}")
+        loop = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{EPOCHS}")
         for batch in loop:
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            labels = batch['labels'].to(device)
+            input_ids = batch["input_ids"].to(device)
+            attention_mask = batch["attention_mask"].to(device)
+            labels = batch["labels"].to(device)
 
             # Forward pass
             logits = model(input_ids, attention_mask)
@@ -262,7 +308,9 @@ def train_model(model_type="bilstm"):
             # RNNs (LSTM/GRU) are especially prone to gradient explosion
             # because gradients are multiplied through many time steps.
             # Clipping limits the gradient norm to a maximum value.
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=GRADIENT_CLIP_MAX_NORM)
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=GRADIENT_CLIP_MAX_NORM
+            )
 
             optimizer.step()
 
@@ -278,16 +326,18 @@ def train_model(model_type="bilstm"):
 
         # ========== Validation with Metrics ==========
         avg_train_loss = total_loss / len(train_loader)
-        avg_val_loss, val_labels, val_probs = evaluate_model(model, val_loader, criterion, device)
+        avg_val_loss, val_labels, val_probs = evaluate_model(
+            model, val_loader, criterion, device
+        )
 
         # Compute comprehensive metrics
         metrics = compute_metrics(val_labels, val_probs)
 
         train_losses.append(avg_train_loss)
         val_losses.append(avg_val_loss)
-        val_aucs.append(metrics['roc_auc_macro'])
+        val_aucs.append(metrics["roc_auc_macro"])
 
-        print(f"\nEpoch {epoch+1}/{EPOCHS} Summary:")
+        print(f"\nEpoch {epoch + 1}/{EPOCHS} Summary:")
         print(f"  Train Loss:     {avg_train_loss:.4f}")
         print(f"  Val Loss:       {avg_val_loss:.4f}")
         print(f"  Val ROC-AUC:    {metrics['roc_auc_macro']:.4f}")
@@ -296,17 +346,42 @@ def train_model(model_type="bilstm"):
         print(f"  Val Recall:     {metrics['recall_macro']:.4f}")
         print(f"  Learning Rate:  {current_lr:.6f}")
 
-        # Check Early Stopping
-        if early_stopper(avg_val_loss, model):
-            print(f"\n🛑 Early stopping at epoch {epoch+1}!")
+        # Check Early Stopping (monitoring ROC-AUC, so higher is better)
+        if early_stopper(metrics["roc_auc_macro"], model):
+            print(f"\nEarly stopping at epoch {epoch + 1}!")
             break
 
     # ========== 7. Final Evaluation on Best Model ==========
     print("\n" + "=" * 60)
     print("FINAL EVALUATION ON VALIDATION SET (Best Model)")
     print("=" * 60)
-    final_val_loss, final_labels, final_probs = evaluate_model(model, val_loader, criterion, device)
+    final_val_loss, final_labels, final_probs = evaluate_model(
+        model, val_loader, criterion, device
+    )
+
+    # Find and use optimal thresholds
+    optimal_thresh = find_optimal_thresholds(final_labels, final_probs)
+    print(f"\nOptimal per-class thresholds: {np.round(optimal_thresh, 2)}")
+
     print_classification_report(final_labels, final_probs, LABEL_COLUMNS)
+
+    # Also show metrics with optimal thresholds
+    from sklearn.metrics import f1_score, precision_score, recall_score
+
+    final_preds_opt = (final_probs >= optimal_thresh).astype(int)
+    print(f"\nMetrics with optimal thresholds:")
+    print(
+        f"  F1 Macro: {f1_score(final_labels, final_preds_opt, average='macro', zero_division=0):.4f}"
+    )
+    print(
+        f"  F1 Micro: {f1_score(final_labels, final_preds_opt, average='micro', zero_division=0):.4f}"
+    )
+    print(
+        f"  Precision Macro: {precision_score(final_labels, final_preds_opt, average='macro', zero_division=0):.4f}"
+    )
+    print(
+        f"  Recall Macro: {recall_score(final_labels, final_preds_opt, average='macro', zero_division=0):.4f}"
+    )
 
     # ========== 8. Plotting ==========
     actual_epochs = len(train_losses)
@@ -314,27 +389,41 @@ def train_model(model_type="bilstm"):
     # Plot 1: Training and Validation Loss
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    axes[0].plot(range(1, actual_epochs + 1), train_losses, label='Train Loss', marker='o')
-    axes[0].plot(range(1, actual_epochs + 1), val_losses, label='Val Loss', marker='s')
-    axes[0].set_xlabel('Epoch')
-    axes[0].set_ylabel('Loss')
-    axes[0].set_title(f'{model_type}: Train vs Val Loss')
+    axes[0].plot(
+        range(1, actual_epochs + 1), train_losses, label="Train Loss", marker="o"
+    )
+    axes[0].plot(range(1, actual_epochs + 1), val_losses, label="Val Loss", marker="s")
+    axes[0].set_xlabel("Epoch")
+    axes[0].set_ylabel("Loss")
+    axes[0].set_title(f"{model_type}: Train vs Val Loss")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
     # Plot 2: Validation ROC-AUC over epochs
-    axes[1].plot(range(1, actual_epochs + 1), val_aucs, label='Val ROC-AUC', marker='D', color='green')
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('ROC-AUC')
-    axes[1].set_title(f'{model_type}: Validation ROC-AUC')
+    axes[1].plot(
+        range(1, actual_epochs + 1),
+        val_aucs,
+        label="Val ROC-AUC",
+        marker="D",
+        color="green",
+    )
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("ROC-AUC")
+    axes[1].set_title(f"{model_type}: Validation ROC-AUC")
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
     # Plot 3: Learning Rate Schedule
-    axes[2].plot(range(1, actual_epochs + 1), learning_rates, label='Learning Rate', marker='^', color='red')
-    axes[2].set_xlabel('Epoch')
-    axes[2].set_ylabel('Learning Rate')
-    axes[2].set_title(f'{model_type}: Learning Rate Schedule')
+    axes[2].plot(
+        range(1, actual_epochs + 1),
+        learning_rates,
+        label="Learning Rate",
+        marker="^",
+        color="red",
+    )
+    axes[2].set_xlabel("Epoch")
+    axes[2].set_ylabel("Learning Rate")
+    axes[2].set_title(f"{model_type}: Learning Rate Schedule")
     axes[2].legend()
     axes[2].grid(True, alpha=0.3)
 

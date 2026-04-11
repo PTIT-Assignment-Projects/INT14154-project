@@ -100,6 +100,9 @@ const schema = z.object({
 const validated = schema.parse(input)
 ```
 
+### No emoji icon
+There must be no emoji or icon in the code or comments. This is to maintain a professional and consistent codebase.
+
 ### Code Quality Checklist
 
 Before marking work complete:
