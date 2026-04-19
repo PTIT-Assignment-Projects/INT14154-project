@@ -106,6 +106,7 @@ identity\_hate & 0.9 & 50.00 (clip) & ~1,400 \\
 
 \subsection{LSTM}
 \begin{frame}{Long Short-Term Memory (LSTM)}
+\footnotesize
 \textbf{Vấn đề của RNN truyền thống:} Vanishing/Exploding Gradient khi xử lý chuỗi dài.
 
 \vspace{0.3cm}
@@ -167,7 +168,8 @@ h_t &= (1 - z_t) \odot \tilde{h}_t + z_t \odot h_{t-1}
 \end{frame}
 
 \subsection{RCNN}
-\begin{frame]{Recurrent Convolutional Neural Network (RCNN)}
+\begin{frame}{Recurrent Convolutional Neural Network (RCNN)}
+\footnotesize
 \textbf{Ý tưởng:} Kết hợp ưu điểm của RNN (ngữ cảnh tuần tự) và CNN (trích xuất đặc trưng cục bộ).
 
 \vspace{0.3cm}
@@ -184,7 +186,7 @@ h_t &= (1 - z_t) \odot \tilde{h}_t + z_t \odot h_{t-1}
 \end{frame}
 
 \subsection{Transformer}
-\begin{frame]{Transformer Encoder (Self-Attention)}
+\begin{frame}{Transformer Encoder (Self-Attention)}
 \textbf{Khác biệt cốt lõi:} Không dùng RNN $\rightarrow$ xử lý song song toàn bộ chuỗi.
 
 \vspace{0.3cm}
@@ -229,8 +231,17 @@ x'' = \text{LayerNorm}(x' + \text{Dropout}(\text{FFN}(x')))
 \]
 \end{frame}
 
+\begin{frame}{Transformer Encoder Block (sơ đồ)}
+\begin{figure}
+\centering
+\includegraphics[height=0.75\textheight]{pic/transformer_encoder_block.png}
+\caption{Sơ đồ kiến trúc Transformer}
+\end{figure}
+\end{frame}
+
 \subsection{Attention}
 \begin{frame}{Cơ chế Attention}
+\footnotesize
 \textbf{Ý tưởng:} Thay vì dùng hidden state cuối cùng hoặc mean pooling, gán \textbf{trọng số khác nhau} cho từng time step.
 
 \vspace{0.3cm}
