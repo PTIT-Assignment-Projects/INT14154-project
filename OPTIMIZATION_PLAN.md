@@ -500,3 +500,14 @@ TOTAL 8 days
 11. Phase 4: HateXplainDataset class with label mapping, download function
 12. Kaggle notebook: Single self-contained notebook aggregating all code
 
+
+### Updated 2026-04-25: Cross-Dataset Design Change
+- HateXplain is kept as **3-class single-label** (normal/offensive/hatespeech), NOT mapped to Jigsaw's 6-label schema
+- Each dataset trains all 8 models **independently** with its own:
+  - Number of output classes (Jigsaw=6, HateXplain=3)
+  - Loss function (CrossEntropyLoss for both)
+  - Metric computation (multi-label AUC vs multi-class AUC, but same macro-average approach)
+- HateXplain path: `/kaggle/input/sayankr007/cyber-bullying-data-for-multi-label-classification/final_hateXplain.csv`
+- Uses `comment` column (text) and `label` column (normal/offensive/hatespeech)
+- HateXplainDataset returns `labels` as `torch.long` (integer class index), JigsawDataset returns `torch.float` (multi-label)
+
