@@ -154,10 +154,6 @@ Attention BiLSTM là sự kết hợp giữa kiến trúc BiLSTM và cơ chế A
 
 Trong mô hình này, đầu ra của BiLSTM là một chuỗi các hidden states (mỗi hidden state có chiều gấp đôi do concatenate hai hướng), sau đó Self-Attention được áp dụng lên chuỗi này để tạo ra một context vector duy nhất đại diện cho toàn bộ câu. Attention weights được tính dựa trên các hidden states từ BiLSTM, cho phép mô hình học được tổ hợp ngữ cảnh hai chiều của từng từ trước khi quyết định mức độ quan trọng.
 
-Mô hình Attention BiLSTM đạt được kết quả F1 Macro tốt nhất trong số tất cả các mô hình được thử nghiệm, chứng tỏ rằng sự kết hợp giữa ngữ cảnh hai chiều và cơ chế attention thực sự mang lại hiệu quả vượt trội. Attention giúp cải thiện đáng kể precision (từ 0.36 lên 0.47) trong khi vẫn duy trì recall ở mức cao (0.84), cho thấy mô hình đã học được cách phân biệt tốt hơn giữa các trường hợp thực sự thuộc nhãn độc hại và các trường hợp dương tính giả.
-
-Số lượng tham số của Attention BiLSTM là 6.5 triệu, gần tương đương với BiLSTM cơ bản (6.3 triệu), cho thấy attention layer chỉ thêm một lượng nhỏ tham số nhưng mang lại cải thiện đáng kể về hiệu suất.
-
 \subsection{Recurrent Convolutional Neural Network (RCNN)}
 RCNN (Recurrent Convolutional Neural Network) là kiến trúc kết hợp giữa RNN và CNN, được đề xuất bởi Lai và cộng sự vào năm 2015 cho bài toán phân loại văn bản tại hội nghị AAAI~\cite{lai2015rcnn}. Ý tưởng cốt lõi của RCNN là sử dụng BiLSTM để thu thập ngữ cảnh hai chiều cho mỗi từ, sau đó kết hợp ngữ cảnh đó với embedding gốc của từ để tạo ra biểu diễn phong phú hơn, rồi cuối cùng sử dụng Max Pooling thay vì Average Pooling để trích xuất các đặc trưng quan trọng nhất.
 
@@ -190,11 +186,7 @@ Fusion layer tích hợp các đặc trưng từ ba nguồn (ngữ cảnh trái,
     \hat{y} = \max_{t \in [1, T]} y_t \quad \text{(Global Max Pooling)}
 \end{equation}
 
-Global Max Pooling lấy giá trị lớn nhất theo chiều thời gian, giúp tập trung vào những đặc trưng nổi bật nhất. Max pooling đặc biệt hiệu quả khi các từ độc hại (như "fuck", "shit" cho obscene) xuất hiện rõ ràng và max pooling có thể dễ dàng chọn ra chúng.
-
-RCNN đạt được ROC-AUC cao nhất trong số tất cả các mô hình (0.9839), cho thấy khả năng xếp hạng các mẫu dương tính cao hơn các mẫu âm tính của mô hình này là tốt nhất. Đặc biệt, RCNN đạt hiệu suất rất cao trên nhãn obscene (F1 = 0.81 với optimal thresholds).
-
-Tuy nhiên, RCNN có số lượng tham số nhiều nhất (6.6 triệu) và F1 Macro của nó (0.5689) không cao bằng Attention BiLSTM (0.6311), cho thấy max pooling không cân bằng precision/recall tốt bằng attention.
+Global Max Pooling lấy giá trị lớn nhất theo chiều thời gian, giúp tập trung vào những đặc trưng nổi bật nhất.
 
 \subsection{Transformer Encoder}
 Transformer là kiến trúc được giới thiệu trong bài báo "Attention Is All You Need" của Vaswani và cộng sự vào năm 2017 tại hội nghị NeurIPS, đánh dấu một bước tiến lớn trong lĩnh vực xử lý ngôn ngữ tự nhiên~\cite{vaswani2017transformer}. Điểm khác biệt cốt lõi của Transformer so với các mô hình RNN là nó không sử dụng cơ chế tuần tự (sequential processing), mà thay vào đó xử lý toàn bộ chuỗi đầu vào song song trong một bước duy nhất.
@@ -250,12 +242,25 @@ Layer Normalization~\cite{ba2016layer} được tính như sau:
 
 Trong đó $\mu = \frac{1}{d} \sum_{i=1}^{d} x_i$ và $\sigma^2 = \frac{1}{d} \sum_{i=1}^{d} (x_i - \mu)^2$ lần lượt là mean và variance của input. Các tham số $\gamma$ và $\beta$ là các tham số có thể học được.
 
-Kết quả của Transformer trong thử nghiệm cho thấy mô hình này đạt ROC-AUC ở mức 0.9789 nhưng F1 Macro thấp nhất trong tất cả các mô hình (0.4625). Nguyên nhân có thể bao gồm việc sử dụng embedding ngẫu nhiên thay vì pretrained embeddings~\cite{pennington2014glove,mikolov2013word2vec}, và cấu hình (2 layers, 8 heads) có thể chưa đủ mạnh.
+\textbf{Pre-Layer Normalization (Pre-LN)}: Khác với Post-LN được mô tả ở trên (LayerNorm sau residual), các phiên bản cải tiến của Transformer sử dụng Pre-LN, áp dụng LayerNorm trước sublayer:
+
+\begin{equation}
+    x' = x + \text{MultiHead}(\text{LayerNorm}(x), \text{LayerNorm}(x), \text{LayerNorm}(x))
+\end{equation}
+\begin{equation}
+    x'' = x' + \text{FFN}(\text{LayerNorm}(x'))
+\end{equation}
+
+Xiong và cộng sự (2020)~\cite{xiong2020layer} đã chứng minh Pre-LN vượt trội so với Post-LN, đặc biệt với các Transformer nhiều layers. Pre-LN giúp gradient flow ổn định hơn trong quá trình backpropagation, tránh gradient explosion ở các layer gần đầu.
+
+\textbf{CLS Token}: Thay vì sử dụng mean pooling trên tất cả các đầu ra, phiên bản cải tiến thêm một token đặc biệt [CLS] vào đầu chuỗi. Token này có khả năng học để tổng hợp thông tin toàn bộ câu thông qua cơ chế self-attention, và đầu ra tại vị trí này được sử dụng trực tiếp cho phân loại. Phương pháp này được sử dụng phổ biến trong BERT~\cite{devlin2019bert} và các mô hình Transformer-based khác.
+
+Trong đề tài này, Transformer được cấu hình với Pre-LN, 4 encoder layers, CLS token, và đầu ra tại vị trí CLS được dùng làm biểu diễn cho phân loại.
 
 \section{Các phương pháp tối ưu hóa huấn luyện}
 
 \subsection{Xử lý dữ liệu mất cân bằng với Class-Weighted Loss}
-Một trong những thách thức lớn nhất của bài toán phân loại bình luận độc hại là sự mất cân bằng nghiêm trọng giữa các lớp. Theo phân tích dữ liệu từ bộ Jigsaw~\cite{kaggleJigsaw}, chỉ khoảng 9.4\% bình luận thuộc lớp toxic, trong khi các lớp thiểu số như threat chỉ chiếm khoảng 0.2\%.
+Một trong những thách thức phổ biến trong các bài toán phân loại là sự mất cân bằng giữa các lớp. Khi số lượng mẫu của các lớp chênh lệch lớn, mô hình có xu hướng thiên về lớp đa số và bỏ qua lớp thiểu số.
 
 Để giải quyết vấn đề này, đề tài sử dụng Binary Cross-Entropy with Logits Loss (BCEWithLogitsLoss) với trọng số lớp (pos\_weight). Trọng số cho mỗi lớp được tính bằng:
 
@@ -267,10 +272,8 @@ Trong đó $p_c$ là số mẫu dương tính của lớp $c$ và $N$ là tổng
 
 Để tránh trọng số quá lớn gây ra over-penalizing lớp đa số, đề tài áp dụng clipping:
 \begin{equation}
-    w_c^{clipped} = \min(w_c, 50)
+    w_c^{clipped} = \min(w_c, \text{max\_weight})
 \end{equation}
-
-Các trọng số cuối cùng: toxic = 9.43, severe\_toxic = 50.00 (clip), obscene = 17.89, threat = 50.00 (clip), insult = 19.26, identity\_hate = 50.00 (clip).
 
 Lin và cộng sự (2017) đã nghiên cứu về Focal Loss như một phương pháp hiệu quả để xử lý dữ liệu mất cân bằng~\cite{lin2017focal}:
 
@@ -290,6 +293,53 @@ Sokolova và Lapalme (2009) đã phân tích chi tiết các độ đo hiệu su
 \end{equation}
 
 F1 Macro là trung bình F1 của các lớp: $F1_{macro} = \frac{1}{C} \sum_{c=1}^{C} F1_c$.
+
+\subsection{Masked Pooling}
+Pooling là bước quan trọng để tổng hợp thông tin từ các time steps của chuỗi thành một vector đại diện duy nhất. Tuy nhiên, khi sử dụng padding để đồng nhất độ dài chuỗi trong batch, các padding tokens (giá trị 0) sẽ làm "pha loãng" biểu diễn cuối cùng nếu pooling được tính trên toàn bộ độ dài.
+
+Trong các phiên bản đầu, cả mean pooling và max pooling đều tính trên toàn bộ chuỗi, bao gồm cả padding tokens. Điều này dẫn đến việc các chuỗi ngắn có đến 50\% tokens là padding, làm giảm đáng kể chất lượng biểu diễn. Để khắc phục, đề tài sử dụng masked pooling, tận dụng attention\_mask (mảng binary với 1 cho token thực và 0 cho padding):
+
+\textbf{Masked Mean Pooling}:
+\begin{equation}
+    \bar{h} = \frac{\sum_{t=1}^T m_t \cdot h_t}{\sum_{t=1}^T m_t + \epsilon}
+\end{equation}
+
+\textbf{Masked Max Pooling}:
+\begin{equation}
+    \tilde{h}_i = \max_{t: m_t = 1} h_{t,i}
+\end{equation}
+
+Trong đó $m_t$ là giá trị attention mask tại time step $t$, $h_t$ là hidden state của RNN. Với max pooling, các padding tokens được set thành $-\infty$ trước khi lấy max, đảm bảo chúng không ảnh hưởng đến kết quả.
+
+\subsection{Focal Loss}
+Focal Loss~\cite{lin2017focal} là một cải tiến của Binary Cross-Entropy, được thiết kế để xử lý dữ liệu mất cân bằng bằng cách giảm trọng số của các mẫu dễ phân loại:
+
+\begin{equation}
+    \mathcal{L}_{focal} = -\frac{1}{N}\sum_{i=1}^N (1-p_{t,i})^\gamma \log(p_{t,i})
+\end{equation}
+
+Với $\gamma = 2$, một mẫu có $p_t = 0.9$ (dễ) sẽ có trọng số $(1-0.9)^2 = 0.01$, trong khi mẫu có $p_t = 0.1$ (khó) có trọng số $(1-0.1)^2 = 0.81$. Điều này giúp mô hình tập trung vào các mẫu khó (thường là các lớp thiểu số) và cải thiện F1 Macro trên các lớp này.
+
+\subsection{Label Smoothing}
+Label Smoothing là kỹ thuật regularization được đề xuất bởi Szegedy và cộng sự (2016)~\cite{szegedy2016rethinking}, nhằm giảm overfitting và cải thiện calibration của mô hình. Thay vì sử dụng nhãn one-hot cứng ($y_c \in \{0, 1\}$), label smoothing tạo ra nhãn mềm:
+
+\begin{equation}
+    y_c^{smooth} = y_c \cdot (1 - \epsilon) + \frac{\epsilon}{C}
+\end{equation}
+
+Với $\epsilon = 0.1$, nhãn 1 trở thành $1 - \epsilon + \epsilon/C$ và nhãn 0 trở thành $\epsilon/C$. Điều này ngăn mô hình trở nên quá tự tin (overconfident) và cải thiện khả năng tổng quát hóa.
+
+\subsection{Gradient Accumulation}
+Gradient Accumulation cho phép mô phỏng effective batch size lớn hơn khi bộ nhớ GPU hạn chế. Thay vì cập nhật tham số sau mỗi batch nhỏ (micro-batch), gradient được tích lũy qua $k$ batches trước khi thực hiện một bước optimizer:
+
+\begin{equation}
+    g_{accum} = \frac{1}{k} \sum_{i=1}^{k} \nabla_\theta \mathcal{L}_i
+\end{equation}
+\begin{equation}
+    \theta \leftarrow \theta - \eta \cdot \text{AdamW}(\theta, g_{accum})
+\end{equation}
+
+Với $k = 4$ và micro-batch size = 64, effective batch size đạt 256, mang lại gradient ổn định hơn và cải thiện chất lượng hội tụ. Smith và cộng sự (2018)~\cite{smith2018superconvergence} đã chứng minh rằng effective batch size lớn giúp huấn luyện ổn định và có thể đạt được hiệu suất tương đương với batch size thực tế.
 
 \subsection{AdamW Optimizer với Weight Decay}
 Adam (Adaptive Moment Estimation) được giới thiệu bởi Kingma và Ba năm 2015~\cite{kingma2015adam}, kết hợp Momentum và RMSprop:
@@ -334,26 +384,21 @@ Graves và cộng sự (2012) đã áp dụng gradient clipping thành công tro
 
 LeCun và cộng sự (1998) đã thảo luận chi tiết về các thủ thuật huấn luyện mạng nơ-ron, bao gồm tầm quan trọng của việc kiểm soát gradient để đảm bảo quá trình huấn luyện ổn định~\cite{lecun1998gradient}.
 
-\subsection{Warmup Cosine LR Scheduler}
-Learning rate là một trong những siêu tham số quan trọng nhất trong huấn luyện mô hình Deep Learning. Đề tài sử dụng Warmup Cosine LR Scheduler - sự kết hợp của hai chiến lược điều chỉnh learning rate.
+\subsection{OneCycleLR}
+OneCycleLR được đề xuất bởi Smith và Topin (2018)~\cite{smith2018superconvergence}, là một chiến lược điều chỉnh learning rate dựa trên nguyên lý "super-convergence". Thay vì warmup rồi giảm dần, OneCycleLR thực hiện đúng một chu kỳ: tăng learning rate từ $lr_{min}$ lên $lr_{max}$ trong giai đoạn đầu, sau đó giảm về $lr_{min}$ trong giai đoạn cuối.
 
-\textbf{Giai đoạn Warmup} (10\% tổng số steps đầu tiên):
 \begin{equation}
-    lr(t) = lr_{base} \cdot \frac{t}{T_{warmup}}, \quad 0 \leq t < T_{warmup}
+    lr(t) = 
+    \begin{cases}
+        lr_{min} + (lr_{max} - lr_{min}) \cdot \dfrac{t}{T_{warmup}}, & 0 \leq t < T_{warmup} \\[1em]
+        lr_{max} - (lr_{max} - lr_{min}) \cdot \Bigl[1 - \dfrac{1}{2}\Bigl(1 & \\
+        \quad + \cos\Bigl(\pi \cdot \dfrac{t - T_{warmup}}{T_{total} - T_{warmup}}\Bigr)\Bigr)\Bigr], & T_{warmup} \leq t < T_{total}
+    \end{cases}
 \end{equation}
 
-Learning rate tăng tuyến tính từ 0 lên $lr_{base}$ ($2 \times 10^{-3}$), giúp mô hình ổn định dần dần và tránh các cập nhật quá mạnh ở giai đoạn đầu.
+Trong cấu hình đề tài: $lr_{max} = 1 \times 10^{-3}$, $pct_{start} = 0.1$ (warmup chiếm 10\% tổng steps), và $T_{total}$ là tổng số batch steps. Khác với Warmup Cosine Scheduler giảm dần đến 0, OneCycleLR chỉ có đúng một chu kỳ tăng-giảm duy nhất trong toàn bộ quá trình huấn luyện.
 
-\textbf{Giai đoạn Cosine Decay} (90\% còn lại):
-\begin{equation}
-    lr(t) = lr_{min} + (lr_{max} - lr_{min}) \cdot \frac{1}{2}\left(1 + \cos\left(\pi \cdot \frac{t - T_{warmup}}{T_{total} - T_{warmup}}\right)\right)
-\end{equation}
-
-Learning rate giảm dần theo hàm cosine, với $lr_{min} = 0$ và $lr_{max} = lr_{base}$. Cosine decay duy trì learning rate ở mức trung bình trong thời gian dài hơn so với linear decay, cho phép mô hình có đủ thời gian để khám phá không gian tham số.
-
-Vaswani và cộng sự (2017) đã sử dụng thành công warmup schedule trong huấn luyện Transformer và nhận thấy rằng nó giúp ổn định quá trình huấn luyện trong giai đoạn đầu~\cite{vaswani2017transformer}.
-
-Loshchilov và Hutter (2017) đã nghiên cứu về SGDR (Stochastic Gradient Descent with Warm Restarts) và nhận thấy rằng việc sử dụng cosine annealing với warm restarts mang lại cải thiện đáng kể trong nhiều bài toán~\cite{loshchilov2017adamw}.
+Smith (2018)~\cite{smith2018superconvergence} đã chứng minh rằng OneCycleLR giúp mô hình hội tụ nhanh hơn đáng kể so với các scheduler truyền thống, có thể đạt được độ chính xác tương đương chỉ với một và phần epochs. Nguyên lý hoạt động dựa trên việc cho phép mô hình "thoát khỏi" các local minima hẹp ở giai đoạn đầu với learning rate cao, sau đó "hạ cánh" vào một local minima rộng và phẳng hơn ở giai đoạn cuối với learning rate thấp.
 
 \subsection{Early Stopping}
 Early Stopping là kỹ thuật regularization đơn giản nhưng hiệu quả, nhằm ngăn chặn overfitting bằng cách dừng quá trình huấn luyện khi validation metric không còn cải thiện.
@@ -375,8 +420,11 @@ Trong đó TPR (True Positive Rate) = Recall và FPR (False Positive Rate) = $\f
 
 Lý do sử dụng ROC-AUC thay vì loss là vì loss có thể bị ảnh hưởng bởi class weights, trong khi ROC-AUC đo lường khả năng phân biệt thực sự của mô hình một cách threshold-independent. Raschka (2018) đã thảo luận chi tiết về tầm quan trọng của việc sử dụng các metric phù hợp để tránh overfitting~\cite{raschka2018roc}.
 
-Thuật toán Early Stopping:
+{
+\RestyleAlgo{boxed}
+\SetAlgoCaptionNoNumber{}
 \begin{algorithm}[H]
+\caption{Thuật toán Early Stopping}
 \DontPrintSemicolon
 \KwIn{patience $p$, best\_score, current\_score}
 \If{current\_score > best\_score}{
@@ -392,6 +440,7 @@ Thuật toán Early Stopping:
     }
 }
 \end{algorithm}
+}
 
 Wolpert (1997) đã chứng minh No Free Lunch Theorems, cho thấy rằng không có thuật toán tối ưu nhất cho mọi bài toán~\cite{wolpert1997no}. Early Stopping là một ví dụ về việc áp dụng nguyên tắc này trong thực tế.
 
@@ -404,8 +453,6 @@ Trong phân loại đa nhãn với đầu ra là xác suất từ sigmoid functi
 \end{equation}
 
 Với mỗi lớp $c$, duyệt qua các giá trị threshold từ 0.1 đến 0.9 với bước nhảy 0.01 và chọn threshold tối ưu dựa trên F1-score cao nhất. Phương pháp này cho phép mỗi lớp có một ngưỡng riêng phù hợp với phân phối và đặc điểm của lớp đó.
-
-Kết quả cho thấy các optimal thresholds thường cao hơn 0.5 đáng kể (từ 0.62 đến 0.89), cho thấy mô hình có xu hướng đưa ra xác suất khá cao cho cả các mẫu không độc hại. Việc tăng threshold giúp lọc bớt các false positives và cải thiện precision.
 
 Fawcett (2006) đã thảo luận chi tiết về tầm quan trọng của việc lựa chọn threshold phù hợp trong các bài toán phân loại và cách nó ảnh hưởng đến ROC curve và các độ đo hiệu suất khác nhau~\cite{fawcett2006introduction}.
 

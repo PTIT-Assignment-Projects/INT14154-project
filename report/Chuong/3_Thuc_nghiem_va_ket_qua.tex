@@ -8,6 +8,8 @@ Phân tích chi tiết phân bố nhãn cho thấy mức độ mất cân bằng
 
 Tập validation chứa 31,915 bình luận, được sử dụng để đánh giá hiệu suất của mô hình và thực hiện các thử nghiệm như tìm kiếm optimal thresholds. Tập test chứa khoảng 153,000 bình luận không có nhãn, được sử dụng để tạo file submission cho cuộc thi Kaggle. Việc đánh giá trên tập validation thay vì tập test (không có ground truth) là cách tiếp cận tiêu chuẩn trong nghiên cứu, cho phép so sánh và phân tích chi tiết hiệu suất của từng mô hình. Raschka (2018) đã thảo luận chi tiết về tầm quan trọng của việc sử dụng validation set để đánh giá và lựa chọn mô hình, tránh để test set ảnh hưởng đến quá trình phát triển mô hình~\cite{raschka2018roc}.
 
+Bên cạnh Jigsaw, đề tài sử dụng bộ dữ liệu HateXplain~\cite{hatexplain2021} để đánh giá chéo. HateXplain được công bố tại ACL 2021, bao gồm 20,109 bình luận được thu thập từ Twitter và Reddit, được gán nhãn bởi ba người gán nhãn độc lập với ba nhãn: normal (bình thường), offensive (xúc phạm), và hatespeech (lời thù hận). Khác với Jigsaw (multi-label, 6 nhãn độc lập), HateXplain là bài toán multi-class với một nhãn duy nhất cho mỗi bình luận. Dữ liệu được chia theo tỷ lệ 80\% cho huấn luyện (16,087 mẫu) và 20\% cho kiểm định (4,022 mẫu). Việc sử dụng hai bộ dữ liệu với nguồn gốc khác nhau (Wikipedia so với Twitter/Reddit) và cấu trúc nhãn khác nhau (multi-label so với multi-class) cho phép đánh giá tính tổng quát của các kiến trúc mô hình trên nhiều điều kiện dữ liệu.
+
 \section{Cấu hình thử nghiệm}
 Để đảm bảo tính công bằng trong việc so sánh giữa các mô hình, tất cả các mô hình đều được huấn luyện với cùng bộ siêu tham số (hyperparameters) và chỉ khác nhau về kiến trúc mô hình. Các siêu tham số chính bao gồm: kích thước batch (batch size) = 64, tốc độ học (learning rate) = $2 \times 10^{-3}$, số epochs tối đa = 10 với Early Stopping (patience = 2), độ dài tối đa chuỗi (max length) = 128 tokens, chiều embedding (embedding dimension) = 128, chiều hidden state (hidden size) = 256, số lớp RNN (num layers) = 2, và tỷ lệ dropout = 0.3. Ngoài ra, các tham số tối ưu hóa bao gồm weight decay = $10^{-4}$, warmup ratio = 0.1, và gradient clip max norm = 1.0. Việc sử dụng chung hyperparameters cho tất cả các mô hình là một phương pháp phổ biến trong nghiên cứu so sánh các kiến trúc mô hình, như được áp dụng trong nhiều nghiên cứu trước đây~\cite{vaswani2017transformer,lai2015rcnn}.
 
@@ -17,24 +19,27 @@ Tokenizer được sử dụng là AutoTokenizer từ thư viện Hugging Face T
 
 Cấu hình chi tiết cho từng mô hình như sau: LSTM và Attention LSTM sử dụng 2 lớp LSTM với hidden size 256, embedding dimension 128; BiLSTM và Attention BiLSTM sử dụng 2 lớp forward LSTM và 2 lớp backward LSTM với hidden size 256 mỗi hướng; GRU sử dụng 2 lớp GRU với hidden size 256; RCNN sử dụng 2 lớp BiLSTM với hidden size 256 mỗi hướng, fusion layer với tanh activation; Transformer sử dụng 2 encoder layers, 8 attention heads, feed-forward dimension 512. Tất cả các mô hình đều sử dụng dropout 0.3 trước lớp fully connected cuối cùng.
 
+Song song với thử nghiệm gốc, đề tài tiến hành thử nghiệm bổ sung với cấu hình tối ưu hóa trên cả hai bộ dữ liệu. Cấu hình mới sử dụng batch size = 32, learning rate = $1 \times 10^{-3}$, gradient accumulation với 2 steps (effective batch size = 64), số epochs tối đa = 5, và OneCycleLR scheduler. Về kiến trúc, Transformer được nâng cấp lên 4 encoder layers với Pre-LN và CLS token thay vì Post-LN và mean pooling, RCNN được mở rộng thêm một lớp fc\_hidden với ReLU activation sau max pooling (EnhancedRCNN), và Attention BiLSTM giữ nguyên kiến trúc self-attention gốc. Masked pooling, label smoothing ($\epsilon = 0.1$), và focal loss ($\gamma = 2.0$) cũng được áp dụng. Các thử nghiệm này được thực hiện trên GPU NVIDIA T4 (Kaggle) với PyTorch.
+
 \section{So sánh tổng quan các mô hình}
 
 Kết quả huấn luyện và đánh giá trên tập validation cho thấy sự khác biệt đáng kể giữa các mô hình. Bảng tổng hợp dưới đây trình bày các chỉ số hiệu suất chính của tất cả 7 mô hình đã được thử nghiệm. Các độ đo được sử dụng bao gồm ROC-AUC (diện tích dưới đường cong ROC), F1 Macro (trung bình F1 của các lớp), và F1 Micro (F1 tính tổng hợp trên tất cả các mẫu và nhãn), được tính toán dựa trên các công thức đã được phân tích chi tiết bởi Sokolova và Lapalme (2009) trong nghiên cứu về các độ đo cho bài toán phân loại~\cite{sokolova2009systematic}.
 
 \begin{table}[H]
 \centering
+\small
 \caption{So sánh hiệu suất các mô hình trên tập validation (159,571 mẫu)}
 \label{tab:model_comparison}
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
-\textbf{Mô hình} & \textbf{Tham số (M)} & \textbf{Best Val AUC} & \textbf{Final AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\ \hline
-Attention BiLSTM & 6.5 & 0.9834 & 0.9830 & 0.6311 & 0.7324 \\ \hline
+\textbf{Mô hình} & \textbf{Tham số (M)} & \textbf{Best AUC} & \textbf{Final AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\ \hline
 RCNN & 6.6 & \textbf{0.9839} & 0.9831 & 0.5689 & 0.6655 \\ \hline
+Attention BiLSTM & 6.5 & 0.9834 & 0.9830 & \textbf{0.6311} & \textbf{0.7324} \\ \hline
 Attention LSTM & 4.9 & 0.9812 & 0.9791 & 0.5650 & 0.6820 \\ \hline
-BiLSTM & 6.3 & 0.9800 & 0.9776 & 0.5520 & 0.6689 \\ \hline
-LSTM & 4.8 & 0.9786 & 0.9761 & 0.5459 & 0.6658 \\ \hline
 GRU & 4.6 & 0.9805 & 0.9793 & 0.5146 & 0.6198 \\ \hline
+BiLSTM & 6.3 & 0.9800 & 0.9776 & 0.5520 & 0.6689 \\ \hline
 Transformer & 4.3 & 0.9789 & 0.9788 & 0.4625 & 0.5947 \\ \hline
+LSTM & 4.8 & 0.9786 & 0.9761 & 0.5459 & 0.6658 \\ \hline
 \end{tabular}
 \end{table}
 
@@ -96,5 +101,89 @@ Thứ tư, Precision vẫn là điểm yếu chung của tất cả các mô hì
 Thứ năm, Transformer với cấu hình hiện tại chưa đạt hiệu suất tốt như các mô hình RNN trong thử nghiệm này. Tuy nhiên, điều này không có nghĩa là Transformer không phù hợp cho bài toán này, mà có thể cần cấu hình khác (nhiều layers hơn, pretrained embeddings, nhiều epochs huấn luyện) để phát huy hết tiềm năng của kiến trúc. Vaswani và cộng sự (2017) đã huấn luyện Transformer với nhiều layers hơn và đạt hiệu suất vượt trội trên bài toán dịch máy~\cite{vaswani2017transformer}.
 
 Cuối cùng, sự kết hợp giữa RCNN (Bi-directional + embedding fusion + max pooling) và Attention BiLSTM (Bi-directional + attention) cho thấy hai hướng tiếp cận khác nhau để cải thiện biểu diễn: RCNN tập trung vào việc trích xuất các đặc trưng mạnh nhất (max pooling), trong khi Attention BiLSTM tập trung vào việc tổng hợp có trọng số các đặc trưng. Lai và cộng sự (2015) đã đề xuất kiến trúc RCNN và nhận thấy rằng việc kết hợp RNN và CNN mang lại hiệu quả tốt trên bài toán phân loại văn bản~\cite{lai2015rcnn}. Cả hai đều vượt trội hơn các mô hình cơ bản không có các cải tiến này.
+
+\section{Kết quả sau tối ưu hóa và đánh giá chéo}
+
+\subsection{Kết quả trên Jigsaw sau tối ưu hóa}
+
+Ở lần chạy đầu (Bảng~\ref{tab:model_comparison}), hai mô hình RNN-based dẫn đầu: RCNN đạt Best AUC cao nhất (0.9839) nhưng F1 Macro chỉ 0.5689, trong khi Attention BiLSTM đạt F1 Macro tốt nhất (0.6311) với AUC 0.9834. Transformer tụt lại với F1 Macro 0.4625, thấp hơn RCNN 0.1064 điểm.
+
+Sau khi áp dụng các kỹ thuật tối ưu hóa, cả ba mô hình đều cải thiện đáng kể về F1 Macro (Bảng~\ref{tab:jigsaw_optimized}), trong khi AUC thay đổi không đáng kể ($\pm 0.0007$). Mức cải thiện cụ thể:
+
+\begin{itemize}
+    \item \textbf{RCNN}: F1 Macro tăng từ 0.5689 lên 0.6530 ($+$14.8\%), nhiều nhất về giá trị tuyệt đối nhờ masked pooling và label smoothing cải thiện calibration.
+    \item \textbf{Transformer}: F1 Macro tăng từ 0.4625 lên 0.6274 ($+$35.7\%), ấn tượng nhất về tỷ lệ, nhờ Pre-LN, CLS token và 4 encoder layers — thu hẹp khoảng cách với RCNN từ 0.1064 xuống còn 0.0256.
+    \item \textbf{Attention BiLSTM}: F1 Macro tăng nhẹ từ 0.6311 lên 0.6344 ($+$0.5\%), do kiến trúc gốc vốn đã hoạt động tốt.
+\end{itemize}
+
+AUC gần như không thay đổi giữa các phiên bản, cho thấy khả năng xếp hạng các mẫu vốn đã tốt từ phiên bản gốc. Các kỹ thuật tối ưu hóa chủ yếu tác động đến việc cải thiện precision và recall tại các ngưỡng quyết định cụ thể, từ đó nâng cao F1 Macro.
+
+\begin{table}[H]
+\centering
+\small
+\caption{So sánh kết quả trên Jigsaw trước và sau tối ưu hóa}
+\label{tab:jigsaw_optimized}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+\textbf{Mô hình} & \textbf{Phiên bản} & \textbf{AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\ \hline
+RCNN & Gốc & 0.9839 & 0.5689 & 0.6655 \\ \hline
+RCNN & Tối ưu & 0.9846 & \textbf{0.6530} & 0.7703 \\ \hline
+Attention BiLSTM & Gốc & 0.9834 & 0.6311 & 0.7324 \\ \hline
+Attention BiLSTM & Tối ưu & 0.9833 & 0.6344 & 0.7608 \\ \hline
+Transformer & Gốc & 0.9789 & 0.4625 & 0.5947 \\ \hline
+Transformer & Tối ưu & 0.9797 & 0.6274 & 0.7497 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Kết quả trên HateXplain}
+Cả ba mô hình đều được huấn luyện trên HateXplain với cấu hình tối ưu. Khác với Jigsaw (multi-label, 6 nhãn), HateXplain là bài toán multi-class với 3 nhãn nên sử dụng CrossEntropyLoss. Kết quả được trình bày trong Bảng~\ref{tab:hatexplain_results}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Kết quả trên HateXplain — 3 mô hình}
+\label{tab:hatexplain_results}
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Mô hình} & \textbf{AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} & \textbf{Precision} & \textbf{Recall} \\ \hline
+RCNN & 0.8156 & 0.6399 & 0.6571 & 0.6484 & 0.6414 \\ \hline
+Attention BiLSTM & 0.8039 & 0.6169 & 0.6380 & 0.6239 & 0.6229 \\ \hline
+Transformer & 0.8087 & 0.6375 & 0.6402 & 0.6415 & 0.6356 \\ \hline
+\end{tabular}
+\end{table}
+
+Nhìn chung, AUC trên HateXplain thấp hơn đáng kể so với Jigsaw (0.80--0.82 so với 0.98), phản ánh độ khó cao hơn của dữ liệu từ Twitter và Reddit cũng như số lượng mẫu ít hơn (20,109 so với 159,571). RCNN đạt AUC cao nhất (0.8156) và F1 Macro cao nhất (0.6399), khẳng định lại ưu thế của kiến trúc kết hợp BiLSTM với max pooling. Transformer đạt F1 Macro 0.6375, rất sát với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Đây là điểm khác biệt quan trọng so với kết quả trên Jigsaw, nơi Transformer ở phiên bản gốc có F1 Macro thấp hơn nhiều so với các mô hình còn lại.
+
+\subsection{So sánh trước và sau tối ưu hóa}
+Bảng~\ref{tab:comparison_summary} tổng hợp mức cải thiện của từng mô hình trên cả hai bộ dữ liệu.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Tổng hợp mức cải thiện F1 Macro}
+\label{tab:comparison_summary}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Mô hình} & \textbf{Jigsaw (gốc)} & \textbf{Jigsaw (tối ưu)} & \textbf{HateXplain} \\ \hline
+RCNN & 0.5689 & 0.6530 ($+$0.0841) & 0.6399 \\ \hline
+Attention BiLSTM & 0.6311 & 0.6344 ($+$0.0033) & 0.6169 \\ \hline
+Transformer & 0.4625 & 0.6274 ($+$0.1649) & 0.6375 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Thảo luận về hiệu suất của Transformer}
+Kết quả từ các thử nghiệm tối ưu hóa và đánh giá chéo cung cấp bằng chứng quan trọng để đánh giá giả thuyết rằng Transformer kém hơn RCNN và Attention BiLSTM do phụ thuộc vào bài toán.
+
+Trên Jigsaw (multi-label), Transformer phiên bản gốc (Post-LN, mean pooling, 2 layers) có F1 Macro 0.4625 --- thấp hơn RCNN (0.5689) khoảng 0.1064 điểm. Tuy nhiên, sau khi áp dụng Pre-LN, CLS token và 4 layers, Transformer đạt F1 Macro 0.6274 --- thu hẹp khoảng cách với RCNN (0.6530) xuống chỉ còn 0.0256 điểm (Bảng~\ref{tab:jigsaw_optimized}). Mức cải thiện 35.7\% cho thấy vấn đề chính không phải do kiến trúc Transformer yếu kém, mà do cấu hình chưa phù hợp.
+
+Trên HateXplain (multi-class), Transformer đạt F1 Macro 0.6375, gần như tương đương với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Kết quả này càng củng cố nhận định rằng Transformer hoàn toàn có thể cạnh tranh với các mô hình RNN-based khi được cấu hình đúng, đặc biệt trên bài toán multi-class.
+
+Hai yếu tố then chốt giúp cải thiện Transformer là:
+\begin{itemize}
+    \item \textbf{Pre-LN}: LayerNorm được đặt trước sublayer thay vì sau residual connection, giúp gradient flow ổn định trong backpropagation, tránh gradient explosion ở các layer gần input. Xiong và cộng sự (2020)~\cite{xiong2020layer} đã chứng minh Pre-LN vượt trội so với Post-LN, đặc biệt với Transformer nhiều layers.
+    \item \textbf{CLS token}: Token đặc biệt học cách tổng hợp toàn bộ câu thông qua cơ chế self-attention, thay vì mean pooling làm pha loãng tín hiệu từ các từ quan trọng. Phương pháp này được sử dụng phổ biến trong BERT~\cite{devlin2019bert}.
+\end{itemize}
+
+Tuy nhiên, RCNN vẫn là mô hình có AUC cao nhất trên cả hai bộ dữ liệu (0.9846 trên Jigsaw, 0.8156 trên HateXplain), cho thấy kiến trúc kết hợp BiLSTM và max pooling là lựa chọn ổn định và đáng tin cậy cho bài toán phân loại văn bản độc hại ở nhiều điều kiện dữ liệu.
 
 \end{document}
