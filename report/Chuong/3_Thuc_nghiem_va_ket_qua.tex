@@ -28,8 +28,6 @@ Kết quả huấn luyện và đánh giá trên tập kiểm định cho thấy
 \begin{table}[H]
 \centering
 \small
-\caption{So sánh hiệu suất các mô hình trên tập kiểm định (159,571 mẫu)}
-\label{tab:model_comparison}
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
 \textbf{Mô hình} & \textbf{Tham số (M)} & \textbf{Best AUC} & \textbf{Final AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\ \hline
@@ -41,6 +39,8 @@ BiLSTM & 6.3 & 0.9800 & 0.9776 & 0.5520 & 0.6689 \\ \hline
 Transformer & 4.3 & 0.9789 & 0.9788 & 0.4625 & 0.5947 \\ \hline
 LSTM & 4.8 & 0.9786 & 0.9761 & 0.5459 & 0.6658 \\ \hline
 \end{tabular}
+\caption{So sánh hiệu suất các mô hình trên tập kiểm định (159,571 mẫu)}
+\label{tab:model_comparison}
 \end{table}
 
 Phân tích kết quả cho thấy RCNN đạt ROC-AUC cao nhất (0.9839), cho thấy khả năng xếp hạng các mẫu dương tính cao hơn các mẫu âm tính của mô hình này là tốt nhất. Attention BiLSTM đứng thứ hai với AUC 0.9834 nhưng đạt F1 Macro cao nhất (0.6311), cho thấy sự cân bằng tốt nhất giữa precision và recall. Sự khác biệt về độ đo này là do AUC đo khả năng phân biệt ở mọi ngưỡng, trong khi F1 Macro tập trung vào hiệu suất tại các ngưỡng tối ưu cho từng lớp. Fawcett (2006) đã giải thích chi tiết sự khác biệt giữa AUC và các độ đo phụ thuộc ngưỡng như F1-score~\cite{fawcett2006introduction}.
@@ -121,8 +121,6 @@ AUC gần như không thay đổi giữa các phiên bản, cho thấy khả nă
 \begin{table}[H]
 \centering
 \small
-\caption{So sánh kết quả trên Jigsaw trước và sau tối ưu hóa}
-\label{tab:jigsaw_optimized}
 \begin{tabular}{|l|c|c|c|c|}
 \hline
 \textbf{Mô hình} & \textbf{Phiên bản} & \textbf{AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} \\ \hline
@@ -133,6 +131,8 @@ Attention BiLSTM & Tối ưu & 0.9833 & 0.6344 & 0.7608 \\ \hline
 Transformer & Gốc & 0.9789 & 0.4625 & 0.5947 \\ \hline
 Transformer & Tối ưu & 0.9797 & 0.6274 & 0.7497 \\ \hline
 \end{tabular}
+\caption{So sánh kết quả trên Jigsaw trước và sau tối ưu hóa}
+\label{tab:jigsaw_optimized}
 \end{table}
 
 \subsection{Kết quả trên HateXplain}
@@ -141,8 +141,6 @@ Cả ba mô hình đều được huấn luyện trên HateXplain với cấu h�
 \begin{table}[H]
 \centering
 \small
-\caption{Kết quả trên HateXplain — 3 mô hình}
-\label{tab:hatexplain_results}
 \begin{tabular}{|l|c|c|c|c|c|}
 \hline
 \textbf{Mô hình} & \textbf{AUC} & \textbf{F1 Macro} & \textbf{F1 Micro} & \textbf{Precision} & \textbf{Recall} \\ \hline
@@ -150,6 +148,8 @@ RCNN & 0.8156 & 0.6399 & 0.6571 & 0.6484 & 0.6414 \\ \hline
 Attention BiLSTM & 0.8039 & 0.6169 & 0.6380 & 0.6239 & 0.6229 \\ \hline
 Transformer & 0.8087 & 0.6375 & 0.6402 & 0.6415 & 0.6356 \\ \hline
 \end{tabular}
+\caption{Kết quả trên HateXplain — 3 mô hình}
+\label{tab:hatexplain_results}
 \end{table}
 
 Nhìn chung, AUC trên HateXplain thấp hơn đáng kể so với Jigsaw (0.80-0.82 so với 0.98), phản ánh độ khó cao hơn của dữ liệu từ Twitter và Reddit cũng như số lượng mẫu ít hơn (20,109 so với 159,571). RCNN đạt AUC cao nhất (0.8156) và F1 Macro cao nhất (0.6399), khẳng định lại ưu thế của kiến trúc kết hợp BiLSTM với max pooling. Transformer đạt F1 Macro 0.6375, rất sát với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Đây là điểm khác biệt quan trọng so với kết quả trên Jigsaw, nơi Transformer ở phiên bản gốc có F1 Macro thấp hơn nhiều so với các mô hình còn lại.
@@ -160,8 +160,6 @@ Bảng~\ref{tab:comparison_summary} tổng hợp mức cải thiện của từn
 \begin{table}[H]
 \centering
 \small
-\caption{Tổng hợp mức cải thiện F1 Macro}
-\label{tab:comparison_summary}
 \begin{tabular}{|l|c|c|c|}
 \hline
 \textbf{Mô hình} & \textbf{Jigsaw (gốc)} & \textbf{Jigsaw (tối ưu)} & \textbf{HateXplain} \\ \hline
@@ -169,6 +167,8 @@ RCNN & 0.5689 & 0.6530 ($+$0.0841) & 0.6399 \\ \hline
 Attention BiLSTM & 0.6311 & 0.6344 ($+$0.0033) & 0.6169 \\ \hline
 Transformer & 0.4625 & 0.6274 ($+$0.1649) & 0.6375 \\ \hline
 \end{tabular}
+\caption{Tổng hợp mức cải thiện F1 Macro}
+\label{tab:comparison_summary}
 \end{table}
 
 \subsection{Thảo luận về hiệu suất của Transformer}
