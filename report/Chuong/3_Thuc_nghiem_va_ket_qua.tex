@@ -2,7 +2,7 @@
 \begin{document}
 
 \section{Tập dữ liệu}
-Bộ dữ liệu được sử dụng trong đề tài là Jigsaw Toxic Comment Classification Challenge từ Kaggle~\cite{kaggleJigsaw}, một trong những cuộc thi phổ biến và được nghiên cứu rộng rãi nhất trong lĩnh vực phân loại văn bản độc hại. Cuộc thi này được tổ chức bởi Jigsaw (trước đây là Google Jigsaw) với mục tiêu phát triển các mô hình có khả năng nhận diện các loại bình luận độc hại khác nhau trên Wikipedia. Bộ dữ liệu này bao gồm các bình luận từ Wikipedia đã được gán nhãn thủ công bởi các chuyên gia kiểm duyệt theo 6 loại độc hại khác nhau. Tổng cộng có 159,571 bình luận trong tập dữ liệu, được chia theo tỷ lệ 80\% cho tập huấn luyện (train) và 20\% cho tập kiểm định (validation), sử dụng phương pháp stratified split để đảm bảo phân phối các lớp được giữ nguyên trong cả hai tập.
+Bộ dữ liệu được sử dụng trong đề tài là Jigsaw Toxic Comment Classification Challenge từ Kaggle~\cite{kaggleJigsaw} với mục tiêu phát triển các mô hình có khả năng nhận diện các loại bình luận độc hại khác nhau trên Wikipedia. Bộ dữ liệu này bao gồm các bình luận từ Wikipedia đã được gán nhãn thủ công bởi các chuyên gia kiểm duyệt theo 6 loại độc hại khác nhau. Tổng cộng có 159,571 bình luận trong tập dữ liệu, được chia theo tỷ lệ 80\% cho tập huấn luyện (train) và 20\% cho tập kiểm định (validation), sử dụng phương pháp stratified split để đảm bảo phân phối các lớp được giữ nguyên trong cả hai tập.
 
 Phân tích chi tiết phân bố nhãn cho thấy mức độ mất cân bằng nghiêm trọng của dữ liệu. Lớp toxic có khoảng 15,000 mẫu dương tính (chiếm khoảng 9.4\% tổng số mẫu), lớp obscene có khoảng 8,000 mẫu (5.0\%), và lớp insult có khoảng 7,600 mẫu (4.8\%). Các lớp thiểu số đặc biệt nghiêm trọng: severe\_toxic chỉ có khoảng 1,600 mẫu (1.0\%), identity\_hate có khoảng 1,400 mẫu (0.9\%), và đặc biệt threat chỉ có khoảng 320 mẫu (0.2\%) - một con số rất nhỏ so với tổng thể 159,571 bình luận. Sự mất cân bằng này đặt ra thách thức lớn cho việc huấn luyện mô hình, buộc phải áp dụng các kỹ thuật xử lý mất cân bằng như Class-Weighted Loss để đảm bảo mô hình không bỏ qua hoàn toàn các lớp thiểu số. Hiện tượng này cũng đã được nghiên cứu trong nhiều bài toán phân loại văn bản khác, như đã được báo cáo bởi các nghiên cứu trước đây về hate speech detection~\cite{djuric2015hate}.
 
@@ -152,7 +152,7 @@ Transformer & 0.8087 & 0.6375 & 0.6402 & 0.6415 & 0.6356 \\ \hline
 \end{tabular}
 \end{table}
 
-Nhìn chung, AUC trên HateXplain thấp hơn đáng kể so với Jigsaw (0.80--0.82 so với 0.98), phản ánh độ khó cao hơn của dữ liệu từ Twitter và Reddit cũng như số lượng mẫu ít hơn (20,109 so với 159,571). RCNN đạt AUC cao nhất (0.8156) và F1 Macro cao nhất (0.6399), khẳng định lại ưu thế của kiến trúc kết hợp BiLSTM với max pooling. Transformer đạt F1 Macro 0.6375, rất sát với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Đây là điểm khác biệt quan trọng so với kết quả trên Jigsaw, nơi Transformer ở phiên bản gốc có F1 Macro thấp hơn nhiều so với các mô hình còn lại.
+Nhìn chung, AUC trên HateXplain thấp hơn đáng kể so với Jigsaw (0.80-0.82 so với 0.98), phản ánh độ khó cao hơn của dữ liệu từ Twitter và Reddit cũng như số lượng mẫu ít hơn (20,109 so với 159,571). RCNN đạt AUC cao nhất (0.8156) và F1 Macro cao nhất (0.6399), khẳng định lại ưu thế của kiến trúc kết hợp BiLSTM với max pooling. Transformer đạt F1 Macro 0.6375, rất sát với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Đây là điểm khác biệt quan trọng so với kết quả trên Jigsaw, nơi Transformer ở phiên bản gốc có F1 Macro thấp hơn nhiều so với các mô hình còn lại.
 
 \subsection{So sánh trước và sau tối ưu hóa}
 Bảng~\ref{tab:comparison_summary} tổng hợp mức cải thiện của từng mô hình trên cả hai bộ dữ liệu.
@@ -174,7 +174,7 @@ Transformer & 0.4625 & 0.6274 ($+$0.1649) & 0.6375 \\ \hline
 \subsection{Thảo luận về hiệu suất của Transformer}
 Kết quả từ các thử nghiệm tối ưu hóa và đánh giá chéo cung cấp bằng chứng quan trọng để đánh giá giả thuyết rằng Transformer kém hơn RCNN và Attention BiLSTM do phụ thuộc vào bài toán.
 
-Trên Jigsaw (multi-label), Transformer phiên bản gốc (Post-LN, mean pooling, 2 layers) có F1 Macro 0.4625 --- thấp hơn RCNN (0.5689) khoảng 0.1064 điểm. Tuy nhiên, sau khi áp dụng Pre-LN, CLS token và 4 layers, Transformer đạt F1 Macro 0.6274 --- thu hẹp khoảng cách với RCNN (0.6530) xuống chỉ còn 0.0256 điểm (Bảng~\ref{tab:jigsaw_optimized}). Mức cải thiện 35.7\% cho thấy vấn đề chính không phải do kiến trúc Transformer yếu kém, mà do cấu hình chưa phù hợp.
+Trên Jigsaw (multi-label), Transformer phiên bản gốc (Post-LN, mean pooling, 2 layers) có F1 Macro 0.4625 - thấp hơn RCNN (0.5689) khoảng 0.1064 điểm. Tuy nhiên, sau khi áp dụng Pre-LN, CLS token và 4 layers, Transformer đạt F1 Macro 0.6274 - thu hẹp khoảng cách với RCNN (0.6530) xuống chỉ còn 0.0256 điểm (Bảng~\ref{tab:jigsaw_optimized}). Mức cải thiện 35.7\% cho thấy vấn đề chính không phải do kiến trúc Transformer yếu kém, mà do cấu hình chưa phù hợp.
 
 Trên HateXplain (multi-class), Transformer đạt F1 Macro 0.6375, gần như tương đương với RCNN (0.6399) và vượt trội so với Attention BiLSTM (0.6169). Kết quả này càng củng cố nhận định rằng Transformer hoàn toàn có thể cạnh tranh với các mô hình RNN-based khi được cấu hình đúng, đặc biệt trên bài toán multi-class.
 

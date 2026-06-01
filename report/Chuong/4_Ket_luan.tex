@@ -25,9 +25,9 @@
 
 Kết quả trên Jigsaw cho thấy RCNN đạt ROC-AUC cao nhất (0.9839 gốc, 0.9846 tối ưu) nhờ kết hợp BiLSTM và max pooling~\cite{lai2015rcnn}. Attention BiLSTM đạt F1 Macro cao nhất ở phiên bản gốc (0.6311) nhờ cơ chế attention tập trung vào các từ quan trọng~\cite{yang2016hierarchical}. Transformer với các cải tiến Pre-LN + CLS token + 4 layers cho thấy mức cải thiện ấn tượng nhất: F1 Macro từ 0.4625 lên 0.6274 (tăng 35.7\%).
 
-Trên HateXplain, RCNN tiếp tục dẫn đầu với AUC 0.8156 và F1 Macro 0.6399. Transformer đạt F1 Macro 0.6375, gần tương đương RCNN và vượt Attention BiLSTM (0.6169), cho thấy Transformer có thể cạnh tranh với RNN-based models trên bài toán multi-class khi được cấu hình đúng. Kết quả này bác bỏ giả thuyết cho rằng Transformer yếu kém một cách cố hữu so với RNN-based models --- hiệu suất Transformer phụ thuộc nhiều vào cấu hình kiến trúc và đặc điểm bài toán.
+Trên HateXplain, RCNN tiếp tục dẫn đầu với AUC 0.8156 và F1 Macro 0.6399. Transformer đạt F1 Macro 0.6375, gần tương đương RCNN và vượt Attention BiLSTM (0.6169), cho thấy Transformer có thể cạnh tranh với RNN-based models trên bài toán multi-class khi được cấu hình đúng. Kết quả này bác bỏ giả thuyết cho rằng Transformer yếu kém một cách cố hữu so với RNN-based models - hiệu suất Transformer phụ thuộc nhiều vào cấu hình kiến trúc và đặc điểm bài toán.
 
-Các kỹ thuật tối ưu hóa (masked pooling, focal loss, gradient accumulation, OneCycleLR) cải thiện hiệu suất ổn định trên tất cả mô hình. Thách thức chính vẫn là sự mất cân bằng dữ liệu: precision trên các lớp thiểu số (threat, severe\_toxic, identity\_hate) còn thấp (0.11--0.37), dẫn đến nhiều false positives.
+Các kỹ thuật tối ưu hóa (masked pooling, focal loss, gradient accumulation, OneCycleLR) cải thiện hiệu suất ổn định trên tất cả mô hình. Thách thức chính vẫn là sự mất cân bằng dữ liệu: precision trên các lớp thiểu số (threat, severe\_toxic, identity\_hate) còn thấp (0.11-0.37), dẫn đến nhiều false positives.
 
 Hướng phát triển bao gồm: sử dụng pretrained embeddings (GloVe, FastText), fine-tuning thêm các class weights, ensemble model kết hợp nhiều kiến trúc, data augmentation cho các lớp thiểu số, và hyperparameter tuning chi tiết hơn cho từng mô hình.
 
