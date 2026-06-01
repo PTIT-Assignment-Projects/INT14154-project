@@ -1,34 +1,33 @@
 \documentclass[../BTL.tex]{subfiles}
 \begin{document}
 
-\section{Tổng kết}
-Đề tài đã hoàn thành việc nghiên cứu và cài đặt từ gốc các mô hình Deep Learning (Attention BiLSTM, RCNN, Transformer) để giải quyết bài toán phân loại bình luận độc hại, với các cải tiến sau:
+Đề tài đã hoàn thành việc nghiên cứu và cài đặt từ gốc các mô hình học sâu (Attention BiLSTM, RCNN, Transformer) để giải quyết bài toán phân loại bình luận độc hại, với các cải tiến sau:
 
 \textbf{Về kiến trúc mô hình:}
 \begin{itemize}
-    \item Transformer được cập nhật từ Post-LN sang Pre-LN, thêm learnable CLS token và tăng lên 4 encoder layers.
+    \item Transformer được cập nhật từ Post-LN sang Pre-LN, thêm token CLS có thể huấn luyện được và tăng lên 4 tầng mã hóa.
     \item RCNN được cải tiến thành EnhancedRCNN với thêm một lớp fc\_hidden sau max pooling.
     \item Attention BiLSTM giữ nguyên kiến trúc gốc với self-attention pooling.
 \end{itemize}
 
 \textbf{Về kỹ thuật huấn luyện:}
 \begin{itemize}
-    \item Masked Pooling: Loại bỏ padding tokens khỏi quá trình pooling, tránh pha loãng biểu diễn.
+    \item Masked Pooling: Loại bỏ các token đệm khỏi quá trình pooling, tránh pha loãng biểu diễn.
     \item Focal Loss: Giảm trọng số mẫu dễ, tập trung vào các mẫu khó (các lớp thiểu số).
-    \item Label Smoothing: Làm mượt nhãn để cải thiện calibration, tránh overconfidence.
-    \item Gradient Accumulation: Effective batch size 256 giúp gradient ổn định hơn.
-    \item OneCycleLR: Tăng learning rate lên max rồi giảm về 0 trong một chu kỳ duy nhất.
-    \item Early Stopping (patience = 3) dựa trên ROC-AUC để tránh overfitting.
+    \item Label Smoothing: Làm mượt nhãn để cải thiện hiệu chỉnh xác suất, tránh hiện tượng quá tự tin.
+    \item Gradient Accumulation: Tích lũy gradient để đạt kích thước batch hiệu quả 256, giúp gradient ổn định hơn.
+    \item OneCycleLR: Tăng tốc độ học lên mức cực đại rồi giảm về 0 trong một chu kỳ duy nhất.
+    \item Early Stopping (patience = 3) dựa trên ROC-AUC để tránh quá khớp.
 \end{itemize}
 
-\textbf{Về đánh giá chéo:} Mô hình được huấn luyện và đánh giá trên hai bộ dữ liệu: Jigsaw (159,571 mẫu, 6 nhãn) và HateXplain (20,109 mẫu, 3 nhãn). Kết quả cho phép so sánh tính nhất quán của các kiến trúc trên các bộ dữ liệu có đặc điểm khác nhau (Wikipedia vs. Twitter/Reddit).
+\textbf{Về đánh giá chéo:} Mô hình được huấn luyện và đánh giá trên hai bộ dữ liệu: Jigsaw (159,571 mẫu, 6 nhãn) và HateXplain (20,109 mẫu, 3 nhãn). Kết quả cho phép so sánh tính nhất quán của các kiến trúc trên các bộ dữ liệu có đặc điểm khác nhau (Wikipedia so với Twitter/Reddit).
 
-Kết quả trên Jigsaw cho thấy RCNN đạt ROC-AUC cao nhất (0.9839 gốc, 0.9846 tối ưu) nhờ kết hợp BiLSTM và max pooling~\cite{lai2015rcnn}. Attention BiLSTM đạt F1 Macro cao nhất ở phiên bản gốc (0.6311) nhờ cơ chế attention tập trung vào các từ quan trọng~\cite{yang2016hierarchical}. Transformer với các cải tiến Pre-LN + CLS token + 4 layers cho thấy mức cải thiện ấn tượng nhất: F1 Macro từ 0.4625 lên 0.6274 (tăng 35.7\%).
+Kết quả trên Jigsaw cho thấy RCNN đạt ROC-AUC cao nhất (0.9839 gốc, 0.9846 tối ưu) nhờ kết hợp BiLSTM và max pooling~\cite{lai2015rcnn}. Attention BiLSTM đạt F1 Macro cao nhất ở phiên bản gốc (0.6311) nhờ cơ chế attention tập trung vào các từ quan trọng~\cite{yang2016hierarchical}. Transformer với các cải tiến Pre-LN + CLS token + 4 tầng mã hóa cho thấy mức cải thiện ấn tượng nhất: F1 Macro từ 0.4625 lên 0.6274 (tăng 35.7\%).
 
-Trên HateXplain, RCNN tiếp tục dẫn đầu với AUC 0.8156 và F1 Macro 0.6399. Transformer đạt F1 Macro 0.6375, gần tương đương RCNN và vượt Attention BiLSTM (0.6169), cho thấy Transformer có thể cạnh tranh với RNN-based models trên bài toán multi-class khi được cấu hình đúng. Kết quả này bác bỏ giả thuyết cho rằng Transformer yếu kém một cách cố hữu so với RNN-based models - hiệu suất Transformer phụ thuộc nhiều vào cấu hình kiến trúc và đặc điểm bài toán.
+Trên HateXplain, RCNN tiếp tục dẫn đầu với AUC 0.8156 và F1 Macro 0.6399. Transformer đạt F1 Macro 0.6375, gần tương đương RCNN và vượt Attention BiLSTM (0.6169), cho thấy Transformer có thể cạnh tranh với các mô hình dựa trên RNN trên bài toán đa lớp khi được cấu hình đúng. Kết quả này bác bỏ giả thuyết cho rằng Transformer yếu kém một cách cố hữu so với các mô hình dựa trên RNN - hiệu suất Transformer phụ thuộc nhiều vào cấu hình kiến trúc và đặc điểm bài toán.
 
-Các kỹ thuật tối ưu hóa (masked pooling, focal loss, gradient accumulation, OneCycleLR) cải thiện hiệu suất ổn định trên tất cả mô hình. Thách thức chính vẫn là sự mất cân bằng dữ liệu: precision trên các lớp thiểu số (threat, severe\_toxic, identity\_hate) còn thấp (0.11-0.37), dẫn đến nhiều false positives.
+Các kỹ thuật tối ưu hóa (masked pooling, focal loss, gradient accumulation, OneCycleLR) cải thiện hiệu suất ổn định trên tất cả mô hình. Thách thức chính vẫn là sự mất cân bằng dữ liệu: precision trên các lớp thiểu số (threat, severe\_toxic, identity\_hate) còn thấp (0.11-0.37), dẫn đến nhiều dương tính giả.
 
-Hướng phát triển bao gồm: sử dụng pretrained embeddings (GloVe, FastText), fine-tuning thêm các class weights, ensemble model kết hợp nhiều kiến trúc, data augmentation cho các lớp thiểu số, và hyperparameter tuning chi tiết hơn cho từng mô hình.
+Hướng phát triển bao gồm: sử dụng các embedding đã được huấn luyện trước (GloVe, FastText), tinh chỉnh thêm trọng số lớp, xây dựng mô hình kết hợp nhiều kiến trúc, data augmentation cho các lớp thiểu số, và tinh chỉnh siêu tham số chi tiết hơn cho từng mô hình.
 
 \end{document}
