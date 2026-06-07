@@ -66,12 +66,6 @@ Output Gate quyết định phần nào của cell state sẽ được xuất ra
 
 Hidden State mới là kết quả của việc nhân Output Gate với tanh của Cell State, quyết định thông tin nào được truyền ra ngoài.
 
-Trong đề tài này, LSTM được cài đặt từ gốc sử dụng các tham số nn.Parameter và các phép toán ma trận cơ bản. Mô hình bao gồm một lớp Embedding chuyển đổi token IDs thành các vector có chiều EMBEDDING\_DIM, tiếp theo là các tầng LSTM xử lý tuần tự từng token, và cuối cùng là Global Average Pooling để tổng hợp hidden states từ tất cả các bước thời gian thành một vector duy nhất:
-
-\begin{equation}
-    \bar{h} = \frac{1}{T} \sum_{t=1}^{T} h_t
-\end{equation}
-
 \subsection{Bidirectional LSTM (BiLSTM)}
 Bidirectional LSTM (BiLSTM) là một mở rộng của LSTM, cho phép xử lý chuỗi đầu vào theo cả hai hướng cùng lúc: từ trái sang phải (tiến) và từ phải sang trái (lùi)~\cite{graves2012supervised}. Ý tưởng cốt lõi là mỗi từ trong câu không chỉ phụ thuộc vào ngữ cảnh đứng trước nó mà còn phụ thuộc vào ngữ cảnh đứng sau nó. Ví dụ trong câu "I don't hate this movie", từ "hate" mang nghĩa tiêu cực, nhưng trong ngữ cảnh đầy đủ "don't hate" lại mang nghĩa tích cực.
 
@@ -388,7 +382,7 @@ LeCun và cộng sự (1998) đã thảo luận chi tiết về các thủ thu�
 OneCycleLR được đề xuất bởi Smith và Topin (2018)~\cite{smith2018superconvergence}, là một chiến lược điều chỉnh tốc độ học dựa trên nguyên lý "hội tụ siêu tốc". Thay vì warmup rồi giảm dần, OneCycleLR thực hiện đúng một chu kỳ: tăng tốc độ học từ $lr_{min}$ lên $lr_{max}$ trong giai đoạn đầu, sau đó giảm về $lr_{min}$ trong giai đoạn cuối.
 
 \begin{equation}
-    lr(t) = 
+    lr(t) =
     \begin{cases}
         lr_{min} + (lr_{max} - lr_{min}) \cdot \dfrac{t}{T_{warmup}}, & 0 \leq t < T_{warmup} \\[1em]
         lr_{max} - (lr_{max} - lr_{min}) \cdot \Bigl[1 - \dfrac{1}{2}\Bigl(1 & \\
