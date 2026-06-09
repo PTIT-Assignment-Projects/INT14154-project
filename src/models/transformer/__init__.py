@@ -1,2 +1,2 @@
 from .transformer_classifier import OwnTransformer
-from .transformer_components import MultiHeadAttention, PositionalEncoding, TransformerEncoderBlock
+from .transformer_components import MultiHeadAttention, PositionalEncoding

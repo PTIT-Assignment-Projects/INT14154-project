@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from src.models.lstm.lstm_cell import OwnLSTMCell
 from ..utils.masked_pooling import masked_max_pool
 

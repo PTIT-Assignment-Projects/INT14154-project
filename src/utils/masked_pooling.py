@@ -3,7 +3,6 @@ Masked pooling utilities for fixing the attention_mask bug.
 All RNN models pass attention_mask to forward() but were ignoring it
 in pooling (padding tokens polluted pooled representations).
 """
-import torch
 
 
 def masked_mean_pool(tensor, attention_mask):

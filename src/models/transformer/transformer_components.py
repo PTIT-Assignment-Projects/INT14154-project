@@ -78,33 +78,4 @@ class MultiHeadAttention(nn.Module):
         return self.W_o(context)
 
 
-class TransformerEncoderBlock(nn.Module):
-    """
-    Single Transformer Encoder Layer.
-    """
 
-    def __init__(self, d_model, num_heads, feedforward_dim, dropout):
-        super(TransformerEncoderBlock, self).__init__()
-        self.attention = MultiHeadAttention(d_model, num_heads)
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-
-        self.ff = nn.Sequential(
-            nn.Linear(d_model, feedforward_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(feedforward_dim, d_model),
-        )
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(self, x, mask=None):
-        # Self-Attention + Residual + Norm
-        attn_out = self.attention(x, x, x, mask=mask)
-        x = self.norm1(
-            x + self.dropout(attn_out)
-        )  # residual vi là x + attn_out, neu chi la attn_out thi se khong goi la residual
-
-        # Feed-Forward + Residual + Norm
-        ff_out = self.ff(x)
-        x = self.norm2(x + self.dropout(ff_out))
-        return x
