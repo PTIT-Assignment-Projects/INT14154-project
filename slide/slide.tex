@@ -62,15 +62,15 @@
 \begin{itemize}
     \item \textbf{Bài toán:} Phân loại đa nhãn (Jigsaw) \& đa lớp (HateXplain) bình luận độc hại
     \begin{itemize}
-        \item Jigsaw: 6 nhãn — toxic, severe\_toxic, obscene, threat, insult, identity\_hate
-        \item HateXplain: 3 nhãn — normal, offensive, hatespeech
+        \item Jigsaw: 6 nhãn - toxic, severe\_toxic, obscene, threat, insult, identity\_hate
+        \item HateXplain: 3 nhãn - normal, offensive, hatespeech
     \end{itemize}
-    \item \textbf{Cài đặt từ gốc (from scratch)} — 3 kiến trúc chính:
+    \item \textbf{Cài đặt từ gốc (from scratch)} - 3 kiến trúc chính:
     \begin{itemize}
         \item RCNN, Attention BiLSTM, Transformer (Pre-LN, 4 tầng)
         \item Được chọn từ 7 mô hình ban đầu (LSTM, BiLSTM, GRU,...)
     \end{itemize}
-    \item \textbf{Tối ưu hóa:} AdamW, Gradient Clipping, Warmup Cosine LR, Class Weights, Focal Loss, Masked Pooling, AMP, GloVe 300D
+    \item \textbf{Tối ưu hóa:} AdamW, Gradient Clipping, Warmup Cosine LR, Class Weights, Masked Pooling, AMP
     \item \textbf{Đánh giá chéo:} Huấn luyện độc lập trên Jigsaw và HateXplain
 \end{itemize}
 \end{frame}
@@ -105,7 +105,7 @@ identity\_hate & 0.9 & 50.00 (clip) & ~1,400 \\
 \begin{frame}{Tập dữ liệu HateXplain}
 \begin{itemize}
     \item \textbf{Nguồn:} HateXplain (AAAI 2021)
-    \item \textbf{Nền tảng:} Twitter, Reddit — bình luận thực tế
+    \item \textbf{Nền tảng:} Twitter, Reddit - bình luận thực tế
     \item \textbf{Tổng số mẫu:} 20,109 bình luận (3 lớp)
     \item \textbf{Chia tập:} 80\% train / 10\% validation / 10\% test
     \item \textbf{3 nhãn:} normal (52\%), offensive (36\%), hatespeech (12\%)
@@ -354,23 +354,6 @@ c &= \sum_{t=1}^{T} \alpha_t h_t
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Focal Loss}
-\textbf{Vấn đề:} Class-weighted BCE vẫn chưa tập trung đủ vào các mẫu khó phân loại (các lớp thiểu số).
-
-\vspace{0.2cm}
-\textbf{Giải pháp:} Focal Loss — giảm trọng số mẫu dễ, tập trung vào mẫu khó:
-\[
-\text{FL}(p_t) = -\alpha_t (1-p_t)^\gamma \log(p_t)
-\]
-
-\vspace{0.2cm}
-\begin{itemize}
-    \item $\gamma = 2$: focusing parameter — càng cao, trọng số mẫu dễ càng giảm
-    \item $\alpha_t$: class weight — cân bằng giữa các lớp
-    \item Đặc biệt hiệu quả trên các lớp thiểu số (threat, identity\_hate)
-\end{itemize}
-\end{frame}
-
 \begin{frame}{Early Stopping}
 \textbf{Giám sát:} \textbf{Validation ROC-AUC (macro)} -- metric chính của bài toán.
 
@@ -404,11 +387,10 @@ c &= \sum_{t=1}^{T} \alpha_t h_t
 
 \begin{frame}{Các cải tiến về code}
 \begin{itemize}
-    \item \textbf{Masked Pooling:} Bỏ qua padding tokens khi tính mean/max pooling — tránh làm loãng đặc trưng
-    \item \textbf{AMP (Automatic Mixed Precision):} Giảm bộ nhớ GPU $\times 2$, tăng tốc $\sim 1.5\times$
-    \item \textbf{GloVe 300D:} Embedding đã được huấn luyện trước thay vì khởi tạo ngẫu nhiên — hội tụ nhanh hơn
-    \item \textbf{Pre-LN Transformer:} LayerNorm đặt trước attention/FFN thay vì sau — huấn luyện ổn định hơn, cho phép 4 tầng mã hóa
-    \item \textbf{CLS token:} Thay thế mean pooling bằng [CLS] token — Transformer cải thiện đáng kể F1 Macro
+    \item \textbf{Masked Pooling:} Bỏ qua padding tokens khi tính mean/max pooling - tránh làm loãng đặc trưng
+    \item \textbf{AMP + Gradient Accumulation:} FP16 mixed precision giảm bộ nhớ GPU, kết hợp cộng dồn gradient - tăng tốc $\sim 1.5\times$
+    \item \textbf{Pre-LN Transformer:} LayerNorm đặt trước attention/FFN thay vì sau - huấn luyện ổn định hơn, cho phép 4 tầng mã hóa
+    \item \textbf{CLS token:} Thay thế mean pooling bằng [CLS] token - Transformer cải thiện đáng kể F1 Macro
 \end{itemize}
 \end{frame}
 
@@ -509,6 +491,40 @@ identity\_hate & 0.14 & 0.84 & 0.23 & 0.9741 \\
 \end{frame}
 
 \begin{frame}{Kết quả tối ưu hóa trên Jigsaw (3 mô hình)}
+\begin{itemize}
+    \item \textbf{Masked Pooling:} Loại bỏ padding tokens trước khi pooling - trước đó padding ($\text{token\_id}=0$) tham gia tính mean/max, làm loãng đặc trưng ngữ nghĩa
+    \item \textbf{AMP + Gradient Accumulation:} FP16 mixed precision giảm bộ nhớ GPU $\sim 40\%$, kết hợp cộng dồn gradient mô phỏng batch lớn hơn - tăng tốc huấn luyện $\sim 1.5\times$
+    \item \textbf{Pre-LN Transformer:} LayerNorm đặt \textit{trước} attention/FFN thay vì sau - tránh vanishing gradient ở tầng sâu, cho phép dùng 4 tầng mã hóa (gốc chỉ dùng 2 tầng Post-LN)
+    \item \textbf{CLS token:} Thay mean pooling bằng \texttt{[CLS]} token output - Transformer chuyên biệt hóa một vector đại diện cho toàn bộ câu
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Tập dữ liệu HateXplain}
+\begin{itemize}
+    \item \textbf{Nguồn:} HateXplain (AAAI 2021) - benchmark hate speech detection
+    \item \textbf{Nền tảng:} Twitter + Reddit - ngôn ngữ tự nhiên, đa dạng chủ đề
+    \item \textbf{Kích thước:} 20,109 bình luận (80/10/10 split)
+    \item \textbf{3 lớp đơn nhãn:} normal (52\%), offensive (36\%), hatespeech (12\%)
+    \item \textbf{Khác biệt với Jigsaw:} Đa lớp vs đa nhãn, ít mẫu hơn (20K vs 160K), phân bố lớp cân bằng hơn
+    \item \textbf{Mục đích:} Kiểm tra tính tổng quát hóa của mô hình trên bài toán/dữ liệu khác
+\end{itemize}
+\vspace{0.2cm}
+\begin{table}
+\centering
+\small
+\begin{tabular}{lcc}
+\toprule
+Nhãn & Số mẫu & Tỷ lệ \\
+\midrule
+normal & 10,457 & 52\% \\
+offensive & 7,239 & 36\% \\
+hatespeech & 2,413 & 12\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}{Kết quả tối ưu hóa trên Jigsaw (3 mô hình)}
 \begin{table}
 \centering
 \small
@@ -547,8 +563,8 @@ AttnBiLSTM & 0.8039 & 0.6169 & 0.6380 & 0.6239 & 0.6229 \\
 \end{table}
 \vspace{0.2cm}
 \begin{itemize}
-    \item AUC thấp hơn Jigsaw (0.80 vs 0.98) — dữ liệu khó hơn, số mẫu ít hơn (20K vs 160K)
-    \item Transformer F1 Macro gần tương đương RCNN — khác biệt rõ so với kết quả trên Jigsaw
+    \item AUC thấp hơn Jigsaw (0.80 vs 0.98) - dữ liệu khó hơn, số mẫu ít hơn (20K vs 160K)
+    \item Transformer F1 Macro gần tương đương RCNN - khác biệt rõ so với kết quả trên Jigsaw
 \end{itemize}
 \end{frame}
 
@@ -567,39 +583,27 @@ AttnBiLSTM & 0.8039 & 0.6169 & 0.6380 & 0.6239 & 0.6229 \\
     \end{itemize}
 \end{itemize}
 \vspace{0.2cm}
-\highlight{Kết luận:} Transformer không yếu hơn RNN về bản chất — hiệu suất phụ thuộc vào cấu hình và đặc thù bài toán.
+\highlight{Kết luận:} Transformer không yếu hơn RNN về bản chất -- hiệu suất phụ thuộc vào cấu hình và đặc thù bài toán.
 \end{frame}
 
 \begin{frame}{Nhận xét chung}
 \begin{itemize}
     \item \textbf{Tối ưu hóa cải thiện đáng kể:} Transformer F1 Macro +35.7\%, RCNN +14.8\% trên Jigsaw
-    \item \textbf{RCNN dẫn đầu trên cả hai tập:} AUC 0.9846 (Jigsaw), 0.8156 (HateXplain) — BiLSTM + max pooling rất hiệu quả
+    \item \textbf{RCNN dẫn đầu trên cả hai tập:} AUC 0.9846 (Jigsaw), 0.8156 (HateXplain) - BiLSTM + max pooling rất hiệu quả
     \item \textbf{Transformer cạnh tranh sau tối ưu:} Pre-LN + CLS + 4 tầng thu hẹp khoảng cách với RCNN từ 0.1064 $\rightarrow$ 0.0256
     \item \textbf{Hiệu suất phụ thuộc bài toán:} Transformer kém trên Jigsaw (đa nhãn) nhưng gần tương đương RCNN trên HateXplain (đa lớp)
-    \item \textbf{GloVe + Masked Pooling cải thiện ổn định:} Tất cả mô hình đều hưởng lợi từ embedding có sẵn và pooling đúng
+    \item \textbf{Masked Pooling cải thiện ổn định:} Tất cả mô hình đều hưởng lợi từ pooling đúng
     \item \textbf{Thách thức còn lại:} Precision thấp ở lớp thiểu số (threat, identity\_hate)
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Hướng phát triển}
-\begin{itemize}
-    \item \textbf{Tinh chỉnh Focal Loss:} Tối ưu tham số $\gamma$ và $\alpha$ cho từng mô hình
-    \item \textbf{Ensemble:} Kết hợp predictions từ RCNN + Transformer
-    \item \textbf{Data augmentation:} Back-translation, synonym replacement cho lớp thiểu số
-    \item \textbf{Hyperparameter tuning:} Grid search / Bayesian optimization cho từng mô hình
-    \item \textbf{HateXplain bản đầy đủ:} Sử dụng 5-fold cross-validation thay vì split đơn
-    \item \textbf{Mở rộng mô hình:} Áp dụng cấu hình tối ưu cho toàn bộ 7 mô hình ban đầu
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Kết luận}
 \begin{itemize}
     \item Đã cài đặt từ gốc \textbf{3 kiến trúc} (RCNN, Attention BiLSTM, Transformer) + đánh giá chéo trên 2 tập dữ liệu
-    \item \textbf{Tối ưu hóa:} Masked Pooling, GloVe, AMP, Pre-LN, Focal Loss — cải thiện F1 Macro lên đến +35.7\%
+    \item \textbf{Tối ưu hóa:} Masked Pooling, AMP, Pre-LN - cải thiện F1 Macro lên đến +35.7\%
     \item \textbf{Kết quả Jigsaw:} RCNN AUC 0.9846, F1 Macro 0.6530; Transformer F1 Macro 0.6274
     \item \textbf{Kết quả HateXplain:} RCNN AUC 0.8156, F1 Macro 0.6399; Transformer gần tương đương (0.6375)
-    \item \textbf{Phát hiện chính:} Transformer không kém hơn RNN — hiệu suất phụ thuộc vào cấu hình và bài toán
-    \item \textbf{Thách thức:} Mất cân bằng lớp — precision thấp ở các lớp thiểu số
+    \item \textbf{Thách thức:} Mất cân bằng lớp - precision thấp ở các lớp thiểu số
 \end{itemize}
 \end{frame}
 
@@ -629,9 +633,6 @@ Bahdanau, D., et al. (2014). Neural machine translation by jointly learning to a
 
 \bibitem[Loshchilov và Hutter(2017)]{adamw}
 Loshchilov, I., \& Hutter, F. (2017). Decoupled weight decay regularization. \textit{ICLR}.
-
-\bibitem[Pennington et al.(2014)]{glove}
-Pennington, J., et al. (2014). GloVe: Global vectors for word representation. \textit{EMNLP}.
 
 \bibitem[Mathew et al.(2021)]{hatexplain}
 Mathew, B., et al. (2021). HateXplain: A benchmark dataset for hate speech detection. \textit{ICLR}.
